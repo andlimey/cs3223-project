@@ -2,3 +2,4 @@ classes/
 testcases/*.md
 testcases/*.txt
 testcases/*.stat
+testcases/*.tbl
