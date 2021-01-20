@@ -6,6 +6,14 @@ package qp.utils;
 
 import java.util.ArrayList;
 
+/* 
+    TODO:
+    Implement SQLQuery Constructors to support the following:
+        - DISTINCT, ORDER BY, GROUP BY
+        - Aggregate functions (AVG, MIN, MAX, COUNT)
+    
+    splitConditionList need to also populate groupbyList and orderbyList, or any other.
+*/
 public class SQLQuery {
 
     ArrayList<Attribute> projectList;    // List of project attributes from select clause
