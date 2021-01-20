@@ -4,6 +4,9 @@
 
 package qp.operators;
 
+/*
+    TODO: Add operators that need to be supported here.
+*/
 public class OpType {
 
     public static final int SCAN = 0;
