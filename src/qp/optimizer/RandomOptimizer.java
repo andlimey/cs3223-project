@@ -12,6 +12,9 @@ import qp.utils.SQLQuery;
 
 import java.util.ArrayList;
 
+/* 
+    TODO: Possibly need to modify makeExecPlan()
+*/
 public class RandomOptimizer {
 
     /**
