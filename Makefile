@@ -1,5 +1,5 @@
 build:
-	bash queryenv;
+	bash queryenv; \
 	./build.sh;
 db:
 	# java RandomDB <tablename> <# of records>
@@ -13,9 +13,14 @@ db:
 	java ConvertTxtToTbl ../testcases/CART; \
 	java ConvertTxtToTbl ../testcases/CARTDETAILS; \
 	java ConvertTxtToTbl ../testcases/CUSTOMER; \
+	cd ..; \
+	mv testcases/*.md .; \
+	mv testcases/*.stat .; \
+	mv testcases/*.txt .; \
+	mv testcases/*.tbl .; 
 
 clean:
-	rm -fv testcases/*.md
-	rm -fv testcases/*.stat
-	rm -fv testcases/*.tbl
-	rm -fv testcases/*.txt
+	rm -fv *.md
+	rm -fv *.stat
+	rm -fv *.tbl
+	rm -fv *.txt
