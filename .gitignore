@@ -1,5 +1,5 @@
 classes/
-testcases/*.md
-testcases/*.txt
-testcases/*.stat
-testcases/*.tbl
+*.md
+*.txt
+*.stat
+*.tbl
