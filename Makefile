@@ -1,5 +1,6 @@
 build:
-	./build.sh
+	bash queryenv;
+	./build.sh;
 db:
 	# java RandomDB <tablename> <# of records>
 	# java ConvertTxtToTbl <tablename>
