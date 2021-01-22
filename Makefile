@@ -1,5 +1,7 @@
+SHELL := /bin/bash
+
 build:
-	bash queryenv; \
+	source queryenv; \
 	./build.sh;
 db:
 	# java RandomDB <tablename> <# of records>
