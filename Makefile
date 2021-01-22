@@ -26,3 +26,4 @@ clean:
 	rm -fv *.stat
 	rm -fv *.tbl
 	rm -fv *.txt
+	rm -fv *.out
