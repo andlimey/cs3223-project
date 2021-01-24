@@ -22,3 +22,4 @@ clean:
 	rm -fv *.tbl
 	rm -fv *.txt
 	rm -fv *.out
+	rm -fv *.det
