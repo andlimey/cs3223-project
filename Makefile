@@ -6,20 +6,15 @@ build:
 db:
 	# java RandomDB <tablename> <# of records>
 	# java ConvertTxtToTbl <tablename>
-	cd classes; \
-	java RandomDB ../testcases/BILL 5; \
-	java RandomDB ../testcases/CART 5; \
-	java RandomDB ../testcases/CARTDETAILS 5; \
-	java RandomDB ../testcases/CUSTOMER 5; \
-	java ConvertTxtToTbl ../testcases/BILL; \
-	java ConvertTxtToTbl ../testcases/CART; \
-	java ConvertTxtToTbl ../testcases/CARTDETAILS; \
-	java ConvertTxtToTbl ../testcases/CUSTOMER; \
-	cd ..; \
-	mv testcases/*.md .; \
-	mv testcases/*.stat .; \
-	mv testcases/*.txt .; \
-	mv testcases/*.tbl .; 
+	cp testcases/*det .; \
+	java RandomDB BILL 5; \
+	java RandomDB CART 5; \
+	java RandomDB CARTDETAILS 5; \
+	java RandomDB CUSTOMER 5; \
+	java ConvertTxtToTbl BILL; \
+	java ConvertTxtToTbl CART; \
+	java ConvertTxtToTbl CARTDETAILS; \
+	java ConvertTxtToTbl CUSTOMER; \
 
 clean:
 	rm -fv *.md
