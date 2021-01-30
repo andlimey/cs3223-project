@@ -80,6 +80,9 @@ public class PlanCost {
             return getStatistics((Orderby) node);
         } else if (node.getOpType() == OpType.GROUPBY) {
             return getStatistics((Groupby) node);
+        } else if (node.getOpType() == OpType.DISTINCT) {
+//            return getStatistics((Distinct) node);
+            return 1;
         }
         System.out.println("operator is        isFeasible = false;\n not supported");
         return 0;
