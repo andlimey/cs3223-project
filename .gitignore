@@ -1,4 +1,7 @@
 classes/
+out/
+.idea/
+*.iml
 *.md
 *.txt
 *.stat
