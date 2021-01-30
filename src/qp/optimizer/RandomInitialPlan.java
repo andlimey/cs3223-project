@@ -22,6 +22,7 @@ public class RandomInitialPlan {
     ArrayList<Condition> selectionlist;   // List of select conditons
     ArrayList<Condition> joinlist;        // List of join conditions
     ArrayList<Attribute> groupbylist;
+    boolean isDistinct;
     int numJoin;            // Number of joins in this query
     HashMap<String, Operator> tab_op_hash;  // Table name to the Operator
     Operator root;          // Root of the query plan tree
@@ -34,6 +35,7 @@ public class RandomInitialPlan {
         joinlist = sqlquery.getJoinList();
         groupbylist = sqlquery.getGroupByList();
         numJoin = joinlist.size();
+        isDistinct = sqlquery.isDistinct();
     }
 
     /**
@@ -47,11 +49,6 @@ public class RandomInitialPlan {
      * prepare initial plan for the query
      **/
     public Operator prepareInitialPlan() {
-
-        if (sqlquery.isDistinct()) {
-            System.err.println("Distinct is not implemented.");
-            System.exit(1);
-        }
 
         if (sqlquery.getGroupByList().size() > 0) {
             System.err.println("GroupBy is not implemented.");
@@ -70,8 +67,17 @@ public class RandomInitialPlan {
             createJoinOp();
         }
         createProjectOp();
+        createDistinctOp();
 
         return root;
+    }
+
+    public void createDistinctOp() {
+        Operator base = root;
+        if (isDistinct) {
+            root = new Distinct(base, OpType.DISTINCT);
+            root.setSchema(base.getSchema());
+        }
     }
 
     /**
@@ -110,7 +116,7 @@ public class RandomInitialPlan {
         // this later in CreateProjectOp
         if (selectionlist.size() == 0) {
             root = tempop;
-            return;
+            return; // seems pointless
         }
 
     }
