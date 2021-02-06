@@ -62,23 +62,32 @@ public class Distinct extends Operator{
                 inbatch = base.next();
                 /** There is no more incoming pages from base operator **/
                 if (inbatch == null) {
+//                    System.out.println("No more input to Distinct, return outbatch.");
                     eos = true;
                     return outbatch;
                 }
             }
-
+//            Debug.PPrint(this);
+//            Debug.PPrint(inbatch);
             /** Continue this for loop until this page is fully observed
              ** or the output buffer is full
              **/
             for (i = start; i < inbatch.size() && (!outbatch.isFull()); ++i) {
                 Tuple present = inbatch.get(i);
                 /** If the tuple is distinct by the overridden Tuple.hashCode(),
-                 ** this tuple is added to the output buffer
+                 ** this tuple is added to the output batch
                  **/
-                if (!set.contains(present)) {
+//                System.out.print("Checking tuple: ");
+                Debug.PPrint(present);
+                boolean containsTuple = set.contains(present);
+//                System.out.println("Does set contain tuple: " + containsTuple);
+                if (!containsTuple) {
                     outbatch.add(present);
                     set.add(present);
                 }
+//                System.out.println("Set: " + set.toString());
+                System.out.println("\n");
+
             }
 
             /** Modify the cursor to the position required
@@ -89,6 +98,8 @@ public class Distinct extends Operator{
             else
                 start = i;
         }
+//        System.out.println("Outbatch is full.");
+//        Debug.PPrint(outbatch);
         return outbatch;
     }
 
