@@ -69,12 +69,25 @@ public class Project extends Operator {
         for (int i = 0; i < attrset.size(); ++i) {
             Attribute attr = attrset.get(i);
 
+            if (true) {
+                System.err.println("attr tab name " + attr.getTabName());
+                System.err.println("attr col name " + attr.getColName());
+                System.err.println("attr agg type " + attr.getAggType());
+                System.err.println("attr attr size " + attr.getAttrSize());
+                System.err.println("attr base attr " + attr.getBaseAttribute());
+                System.err.println("attr key type " + attr.getKeyType());
+                System.err.println("attr projected type " + attr.getProjectedType());
+                System.err.println("attr type " + attr.getType());
+            }
+
             if (attr.getAggType() != Attribute.NONE) {
                 System.err.println("Aggragation is not implemented.");
-                System.exit(1);
+//                System.exit(1);
             }
 
             int index = baseSchema.indexOf(attr.getBaseAttribute());
+            Debug.PPrint(baseSchema);
+            System.err.println("attr type " + attr.getType());
             attrIndex[i] = index;
         }
         return true;
@@ -92,18 +105,45 @@ public class Project extends Operator {
             return null;
         }
 
+        int tempMax = -1;
+        Object temp = null;
+
+        // Loop each row
         for (int i = 0; i < inbatch.size(); i++) {
             Tuple basetuple = inbatch.get(i);
-            //Debug.PPrint(basetuple);
+            System.err.println("************");
+            Debug.PPrint(basetuple);
             //System.out.println();
             ArrayList<Object> present = new ArrayList<>();
+            //Loop each column per row
+
             for (int j = 0; j < attrset.size(); j++) {
+                //if MAX attr
+
+                if(attrset.get(j).getAggType() == 1) {
+                    Object data = basetuple.dataAt(attrIndex[j]);
+                    if( j > tempMax) {
+                        tempMax = j;
+                        temp = data;
+                    }
+                }
+
+                if(j == attrset.size() - 1)
+                    present.add(temp);
+                System.err.println("=======");
                 Object data = basetuple.dataAt(attrIndex[j]);
-                present.add(data);
+//                present.add(data);
+                System.err.println("=======");
             }
             Tuple outtuple = new Tuple(present);
+            System.err.println("******00*****");
+            Debug.PPrint(outtuple);
             outbatch.add(outtuple);
+            System.err.println("************");
         }
+
+
+
         return outbatch;
     }
 
