@@ -10,36 +10,9 @@ import java.io.EOFException;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.util.ArrayList;
 
 public class Debug {
-
-    public static void PPrint(String fn) {
-        ObjectInputStream in = null;
-        System.out.println("Printing out serialised file of Batch objects: " + fn);
-        try {
-            in = new ObjectInputStream(new FileInputStream(fn));
-        } catch (Exception e) {
-            System.err.println(" Error reading " + fn);
-            System.exit(1);
-        }
-
-        while (true) {
-            try {
-                Batch data = (Batch) in.readObject();
-                Debug.PPrint(data);
-            } catch (ClassNotFoundException cnf) {
-                System.err.println("Debug:Class not found for reading file  " + fn);
-                System.exit(1);
-            } catch (EOFException EOF) {
-                System.out.println("EOF reached.");
-                break;
-            } catch (IOException e) {
-                System.err.println("Debug:Error reading " + fn);
-                System.exit(1);
-            }
-        }
-    }
-
     /**
      * print the attribute
      **/
@@ -157,7 +130,6 @@ public class Debug {
         }
     }
 
-
     /**
      * print a tuple
      **/
@@ -182,6 +154,46 @@ public class Debug {
         for (int i = 0; i < b.size(); i++) {
             PPrint(b.get(i));
             System.out.println();
+        }
+    }
+
+    /**
+     * print an arraylist of tuples
+     **/
+    public static void PPrint(ArrayList<Tuple> l) {
+        for (Tuple t : l) {
+            PPrint(t);
+        }
+    }
+
+    /**
+     * Prints out the tuples in each of the Batches from a serialised file of Batches
+     * @param fn file name of serialised Batch objects
+     */
+    public static void PPrint(String fn) {
+        ObjectInputStream in = null;
+        System.out.println("Printing out serialised file of Batch objects: " + fn);
+        try {
+            in = new ObjectInputStream(new FileInputStream(fn));
+        } catch (Exception e) {
+            System.err.println(" Error reading " + fn);
+            System.exit(1);
+        }
+
+        while (true) {
+            try {
+                Batch data = (Batch) in.readObject();
+                Debug.PPrint(data);
+            } catch (ClassNotFoundException cnf) {
+                System.err.println("Debug:Class not found for reading file  " + fn);
+                System.exit(1);
+            } catch (EOFException EOF) {
+                System.out.println("EOF reached.");
+                break;
+            } catch (IOException e) {
+                System.err.println("Debug:Error reading " + fn);
+                System.exit(1);
+            }
         }
     }
 }

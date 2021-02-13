@@ -427,7 +427,7 @@ public class Distinct extends Operator{
         outbatch = new Batch(batchsize);
 
         Tuple nextTuple;
-        if (unique == null) unique = reader.next(); 
+        if (unique == null) unique = reader.next();
         while (!outbatch.isFull()) {
             if (reader.isEOF()) {
                 outbatch.add(unique);
@@ -441,7 +441,7 @@ public class Distinct extends Operator{
                 outbatch.add(unique);
                 unique = nextTuple;
             }
-            // when unique == nextTuple, ignore the duplicates  
+            // when unique == nextTuple, ignore the duplicates
         }
 
         // System.out.println("Outbatch is full.");
@@ -452,6 +452,7 @@ public class Distinct extends Operator{
     @Override
     public boolean close() {
         DeleteFiles(runNames);
+
         base.close();
         return true;
     }

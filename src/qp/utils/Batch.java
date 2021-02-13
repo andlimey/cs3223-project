@@ -55,6 +55,8 @@ public class Batch implements Serializable {
         return tuples.contains(t);
     }
 
+    public ArrayList<Tuple> getAllTuplesCopy() { return new ArrayList<>(tuples); }
+
     public Tuple get(int i) {
         return tuples.get(i);
     }

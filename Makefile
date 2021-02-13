@@ -9,8 +9,8 @@ db:
 	# java ConvertTxtToTbl <tablename>
 	cp testcases/*det .; \
 	java RandomDB BILL 20; \
-	java RandomDB CART 5; \
-	java RandomDB CARTDETAILS 5; \
+	java RandomDB CART 20; \
+	java RandomDB CARTDETAILS 20; \
 	java RandomDB CUSTOMER 20; \
 	java ConvertTxtToTbl BILL; \
 	java ConvertTxtToTbl CART; \
@@ -38,3 +38,6 @@ clean:
 	rm -fv *.txt
 	rm -fv *.out
 	rm -fv *.det
+
+temp:
+    rm -f temp-*
