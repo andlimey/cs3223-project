@@ -85,6 +85,12 @@ public class SortMergeJoin extends Join {
         return runNames;
     }
 
+    /**
+     * @param base base name used in temp file naming
+     * @param passnum corresponds to the nth pass
+     * @param runnum corresponds to the nth run
+     * @return a unique filename that is representative of the tempfile
+     */
     private String getRfname(String base, int passnum, int runnum) {
         return String.format("%s-pass%d-run%d", base, passnum, runnum);
     }
@@ -144,11 +150,10 @@ public class SortMergeJoin extends Join {
     }
 
     private void merge(ArrayList<String> runs, String newfname) {
-        // if runs.size() < numBuff-1, then should split evenly across the numBuffs somehow
-        // Use ArrayList<Tuple>s first, later change to batch-by-batch reading
+        // TODO: if runs.size() < numBuff-1, then all numBuffs should be used
+        // TODO: Use ArrayList<Tuple>s first, later change to batch-by-batch reading
 
-        // Use ArrayList as resFile first, later store as file
-        ArrayList<ArrayList<Tuple>> r = new ArrayList<>();
+        ArrayList<ArrayList<Tuple>> r = new ArrayList<>(); // represents the merged sorted run
 
         for (String rname : runs) {
             try {
@@ -185,13 +190,15 @@ public class SortMergeJoin extends Join {
                     minI = i;
                 }
             }
+            // chosen refers to the run with the smallest 'head'
             ArrayList<Tuple> chosen = r.get(minI);
             chosen.remove(min);
-            if (chosen.isEmpty()) r.remove(chosen);
+            if (chosen.isEmpty()) r.remove(chosen); // if a run is empty, remove it from r.
             merged.add(min);
         }
         System.out.println("LeftMergedRun: ");
         Debug.PPrint(merged);
+        //TODO: Should be written out on batch-by-batch basis, to simulate the single output buffer
         try {
             ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(newfname));
             for (Tuple t : merged) {
