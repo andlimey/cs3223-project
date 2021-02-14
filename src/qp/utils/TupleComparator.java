@@ -8,7 +8,7 @@ import static qp.utils.Tuple.compareTuples;
 public class TupleComparator implements Comparator<Tuple> {
     ArrayList<Integer> attrList;
 
-    TupleComparator(int[] attrList) {
+    public TupleComparator(int[] attrList) {
         this.attrList = new ArrayList<Integer>(Arrays.stream(attrList).boxed().collect(Collectors.toList()));
     }
 
