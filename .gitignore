@@ -4,3 +4,8 @@ classes/
 *.stat
 *.tbl
 *.det
+/testoutput
+/out
+/.idea
+cs3223-project.iml
+temp*
