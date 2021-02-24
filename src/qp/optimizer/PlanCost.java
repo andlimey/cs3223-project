@@ -76,10 +76,17 @@ public class PlanCost {
             return getStatistics((Project) node);
         } else if (node.getOpType() == OpType.SCAN) {
             return getStatistics((Scan) node);
+        } else if (node.getOpType() == OpType.ORDERBY) {
+            return getStatistics((Orderby) node);
         }
-        System.out.println("operator is not supported");
-        isFeasible = false;
+        System.out.println("operator is        isFeasible = false;\n not supported");
         return 0;
+    }
+
+    // TODO: Temp method
+    protected long getStatistics(Orderby node) {
+        long result = calculateCost(node.getBase());
+        return result;
     }
 
     /**
