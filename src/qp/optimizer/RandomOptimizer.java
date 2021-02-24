@@ -45,6 +45,7 @@ public class RandomOptimizer {
      * * prepare an execution plan by replacing the methods with
      * * corresponding join operator implementation
      **/
+    //TODO
     public static Operator makeExecPlan(Operator node) {
         if (node.getOpType() == OpType.JOIN) {
             Operator left = makeExecPlan(((Join) node).getLeft());
@@ -58,6 +59,12 @@ public class RandomOptimizer {
                     nj.setRight(right);
                     nj.setNumBuff(numbuff);
                     return nj;
+                case JoinType.BLOCKNESTED:
+                    BlockNestedJoin bnj = new BlockNestedJoin((Join) node);
+                    bnj.setLeft(left);
+                    bnj.setRight(right);
+                    bnj.setNumBuff(numbuff);
+                    return bnj;
                 default:
                     return node;
             }
