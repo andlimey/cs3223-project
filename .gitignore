@@ -1,0 +1,12 @@
+classes/
+*.md
+*.txt
+*.stat
+*.tbl
+*.det
+/testoutput
+/out
+/.idea
+/testcases
+cs3223-project.iml
+temp*
