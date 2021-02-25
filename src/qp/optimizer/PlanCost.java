@@ -85,8 +85,7 @@ public class PlanCost {
 
     // TODO: Temp method
     protected long getStatistics(Orderby node) {
-        long result = calculateCost(node.getBase());
-        return result;
+        return calculateCost(node.getBase());
     }
 
     /**

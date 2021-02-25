@@ -1,16 +1,13 @@
 package qp.operators;
 
-import qp.utils.Attribute;
-import qp.utils.Batch;
-import qp.utils.Schema;
-import qp.utils.Tuple;
-import qp.utils.TupleComparator;
+import qp.utils.*;
 
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.ObjectOutputStream;
-import java.util.ArrayList;
-import java.util.Collections;
+import java.io.*;
+import java.lang.reflect.Array;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import static java.lang.Math.min;
 
 public class Orderby extends Operator {
 
@@ -18,11 +15,10 @@ public class Orderby extends Operator {
     ArrayList<Attribute> attrset;  // Set of attributes to order by
     int batchsize;                 // Number of tuples per outbatch
     boolean isDesc;
-    int numBuffer;                 // Number of buffers used for sorting
+    int numBuffer = 3;             // Number of buffers used for sorting. Minimally need 3.
     int numRuns = 0;
     int passNum = 0;
     int maxTuples;                 // Max number of tuples the main memory can store
-    ArrayList<Tuple> mainMemory;   // Simulate memory
     ArrayList<String> runNames = new ArrayList<>();
 
     /**
@@ -74,6 +70,7 @@ public class Orderby extends Operator {
         if (!base.open()) return false;
         StoreIndexToOrderBy();
         GenerateSortedRuns();
+        MergeSortedRuns();
         return true;
     }
 
@@ -95,26 +92,27 @@ public class Orderby extends Operator {
      **/
     private void GenerateSortedRuns() {
         maxTuples = numBuffer * batchsize;
-        mainMemory = new ArrayList<>(maxTuples);
+        ArrayList<Tuple> mainMemory = new ArrayList<>(maxTuples);   // Simulate main memory
         inbatch = base.next();
 
         while (inbatch != null) {
             if (mainMemory.size() != maxTuples) {
-                ReadTuplesIntoMemory();
+                ReadTuplesIntoMemory(mainMemory);
             }
             else {
-                SortTuplesInMemory();
-                WriteTuplesToFile(passNum, numRuns);
+                SortTuplesInMemory(mainMemory);
+                WriteTuplesToFile(mainMemory, passNum, numRuns);
                 mainMemory.clear();
                 numRuns++;
+                continue;
             }
             inbatch = base.next();
         }
 
         // Store remaining tuples (if any)
         if (!mainMemory.isEmpty()) {
-            SortTuplesInMemory();
-            WriteTuplesToFile(passNum, numRuns);
+            SortTuplesInMemory(mainMemory);
+            WriteTuplesToFile(mainMemory, passNum, numRuns);
             mainMemory.clear();
             numRuns++;
         }
@@ -123,11 +121,11 @@ public class Orderby extends Operator {
     /**
      * ReadTuplesIntoMemory() reads tuples from the file into main memory.
      */
-    private void ReadTuplesIntoMemory() {
+    private void ReadTuplesIntoMemory(ArrayList<Tuple> mainMemory) {
         mainMemory.addAll(inbatch.getAllTuplesCopy());
     }
 
-    private void SortTuplesInMemory() {
+    private void SortTuplesInMemory(ArrayList<Tuple> mainMemory) {
         if (this.isDesc()) {
             Collections.sort(mainMemory, new TupleComparator(attrIndex).reversed());
         } else {
@@ -135,8 +133,8 @@ public class Orderby extends Operator {
         }
     }
 
-    private void WriteTuplesToFile(int passNum, int runNum) {
-        String filename = String.format("Orderby_Pass-%d_Run-%d", passNum, runNum);
+    private void WriteTuplesToFile(ArrayList<Tuple> mainMemory, int passNum, int runNum) {
+        String filename = GenerateFileName(passNum, runNum);
         try {
             ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(filename));
             out.writeObject(mainMemory);
@@ -146,38 +144,223 @@ public class Orderby extends Operator {
         }
     }
 
-    /**
-     * Merges the sorted runs
-     */
-    private void MergeSortedRuns() {
-        /**
-         *  While numRuns > numBuffers:
-         *      While there are still runs to merge:
-         *          For each run in current set of runs:
-         *              Open file and prepare to read
-         *
-         *          While all open runs are still not empty:
-         *              Read into (numBuffers-1) array of size batchsize
-         *              MergeKArrays
-         */
+    private String GenerateFileName(int passNum, int runNum) {
+        return String.format("Orderby_Pass-%d_Run-%d", passNum, runNum);
     }
 
-    private void MergeKArrays(ArrayList<ArrayList<Tuple>> arr, int numArrays) {
-        // https://www.geeksforgeeks.org/merge-k-sorted-arrays/
+    /**
+     * Merges the sorted runs until the last step.
+     */
+    private void MergeSortedRuns() {
+        int numBuffersForMerge = numBuffer - 1;
+
+        assert numBuffersForMerge > 1;
+
+        // Last merge step to be done in next()
+        if (numRuns <= numBuffersForMerge) {
+            return;
+        }
+
+        ArrayList<String> mergedRuns = new ArrayList<>();
+
+        // While condition ensures that last step is reserved for next()
+        while (numRuns > numBuffersForMerge) {
+            int counter = 0;
+
+            // Number of runs to merge is constrained by number of buffers available
+            // i and j are used to retrieve the set of runs to merge
+            for (int i = 0, j = numBuffersForMerge; i < j; i = j, j = min(j + numBuffersForMerge, runNames.size())) {
+                ArrayList<String> runsToMerge = new ArrayList<>(runNames.subList(i, j));
+                String mergedFileName = GenerateFileName(passNum+1, counter);
+                MergeKArrays(runsToMerge, mergedFileName);
+                mergedRuns.add(mergedFileName);
+
+                counter++;
+            }
+            passNum++;
+
+            // Deletes runs already merged in current pass.
+            for (String filename : runNames) {
+                File f = new File(filename);
+                f.delete();
+            }
+            runNames.addAll(mergedRuns);
+            mergedRuns.clear();
+        }
+    }
+
+    private void MergeKArrays(ArrayList<String> runNames, String mergedFileName) {
+        ObjectOutputStream outputStream = null;
+        try {
+            outputStream = new ObjectOutputStream(new FileOutputStream(mergedFileName));
+        } catch (IOException io) {
+            System.out.println("Error writing to temporary file");
+            System.exit(1);
+        }
+
+        // Init buffers for merging
+        Batch outputBuffer = new Batch(batchsize);  // 1 buffer reserved for output
+        Batch[] buffers = new Batch[numBuffer-1];
+        for (int i = 0; i < numBuffer - 1; i++) {
+            buffers[i] = new Batch(batchsize);
+        }
+
+        // Init streams for runs
+        ArrayList<ObjectInputStream> runs = new ArrayList<>();
+        for (String rname : runNames) {
+            try {
+                ObjectInputStream input = new ObjectInputStream(new FileInputStream(rname));
+                runs.add(input);
+            } catch (IOException io) {
+                System.out.println("Error reading in file: " + rname);
+                System.exit(1);
+            }
+        }
+
+        boolean[] endOfStream = new boolean[numBuffer-1];
+        boolean isMergeComplete = false;
+
+        while (!isMergeComplete) {
+            // Read tuples into buffers
+            for (int i = 0; i < runs.size(); i++) {
+                if (endOfStream[i]) {
+                    System.out.println("Object Input Stream for run " + i + " is closed");
+                    continue;
+                }
+
+                if (!buffers[i].isEmpty()) {
+                    System.out.println("Buffer " + i + " still contain tuples. Don't read in new batch yet");
+                    continue;
+                }
+
+                ObjectInputStream run = runs.get(i);
+                System.out.println("Reading batches for run " + i);
+                try {
+                    Batch data = (Batch) run.readObject();
+                    buffers[i] = data;
+                } catch (ClassNotFoundException e) {
+                    System.out.println("Class not found for reading batch");
+                    System.exit(1);
+                } catch (EOFException eof) {
+                    System.out.println("EOF reached for this run");
+                    endOfStream[i] = true;
+                } catch (IOException io) {
+                    System.out.println("Error reading in batch.");
+                    System.exit(1);
+                }
+            }
+
+            // Merge buffers into output buffer until full or until all buffers are empty
+            while (!outputBuffer.isFull()) {
+                Tuple minSoFar = null;
+                Batch chosen = null;
+
+                for (Batch b : buffers) {
+                    if (!b.isEmpty()) {
+                        minSoFar = b.get(0);
+                        chosen = b;
+                        break;
+                    }
+                }
+
+                if (minSoFar == null) {
+                    // Input buffers are all empty.
+                    break;
+                }
+
+                // Find minimum
+                for (int i = 0; i < buffers.length; i++) {
+                    // Ignore empty buffer and empty stream.
+                    if (endOfStream[i] && buffers[i].isEmpty()) {
+                        continue;
+                    }
+
+                    // Read Tuples into this empty buffer.
+                    if (!endOfStream[i] && buffers[i].isEmpty()) {
+                        try {
+                            Batch data = (Batch) runs.get(i).readObject();
+                            buffers[i] = data;
+                        } catch (ClassNotFoundException e) {
+                            System.out.println("Class not found for reading batch");
+                            System.exit(1);
+                        } catch (EOFException eof) {
+                            System.out.println("EOF reached for this run");
+                            endOfStream[i] = true;
+                        } catch (IOException io) {
+                            System.out.println("Error reading in batch.");
+                            System.exit(1);
+                        }
+                    }
+
+                    Tuple current = buffers[i].get(0);
+                    // minSoFar > current
+                    if (Tuple.compareTuples(minSoFar, current, new ArrayList<>(Arrays.stream(attrIndex).boxed().collect(Collectors.toList()))) == 1) {
+                        minSoFar = current;
+                        chosen = buffers[i];
+                    }
+                }
+
+                // Add minimum to output buffer
+                chosen.remove(0);
+                outputBuffer.add(minSoFar);
+            }
+
+            if (outputBuffer.isEmpty()) {
+                System.out.println("Output buffer is empty. Don't write");
+                continue;
+            }
+
+            // Write out to file
+            try {
+                outputStream.writeObject(outputBuffer);
+                outputBuffer.clear();
+            } catch (IOException io) {
+                System.out.println("Error writing to new run");
+                System.exit(1);
+            }
+
+            isMergeComplete = CheckIfMergeComplete(endOfStream, buffers);
+        }
+
+        try {
+            outputStream.close();
+        } catch (IOException e) {
+            System.out.println("Error closing stream");
+            System.exit(1);
+        }
+    }
+
+    private boolean CheckIfMergeComplete(boolean[] eos, Batch[] buffers) {
+        for (int i = 0; i < eos.length; i++) {
+            if (!eos[i]) {
+                return false;
+            }
+        }
+        for (int i = 0; i < buffers.length; i++) {
+            if (buffers[i].isEmpty()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
      * Read next tuple from operator
      */
     public Batch next() {
-        outbatch = new Batch(batchsize);
-        return outbatch;
+        // Determine next output item
+        // Read new item from the correct run file
+        return null;
+    }
+
+    private void MergeLast() {
     }
 
     /**
      * Close the operator
      */
     public boolean close() {
+        // Destroy remaining run files
         return true;
     }
 
