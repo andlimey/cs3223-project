@@ -7,7 +7,15 @@ out/
 *.stat
 *.tbl
 *.det
+<<<<<<< HEAD
+=======
+*.out
+>>>>>>> a72f67d... update gitignore
 /testoutput
 /out
 /.idea
 cs3223-project.iml
+<<<<<<< HEAD
+=======
+temp*
+>>>>>>> a72f67d... update gitignore
