@@ -185,6 +185,7 @@ public class SortMergeJoin extends Join {
         // TODO: if runNames.size() < numBuff-1, then all numBuffs should be used
         System.out.println("====== merge(): " + mergedRunFileName + "======");
         System.out.println("Merging runs: " + runNames);
+
         // Init OOS for mergedRunFileName
         ObjectOutputStream oos = null;
         try {
@@ -194,7 +195,7 @@ public class SortMergeJoin extends Join {
             System.exit(1);
         }
 
-            // Init buffers
+        // Init buffers
         Batch out = new Batch(bsize);
         Batch[] buffers = new Batch[numBuff-1];
         for (int i = 0; i < numBuff-1; i++) {
@@ -216,8 +217,6 @@ public class SortMergeJoin extends Join {
         // Track closed input streams
         boolean[] eos = new boolean[numBuff-1];
         boolean isMergeComplete = false;
-
-        ArrayList<Batch> xs = new ArrayList<>();
 
         while(!isMergeComplete) { // exists an unfinished input stream
             assert runs.size() <= buffers.length;
@@ -329,7 +328,6 @@ public class SortMergeJoin extends Join {
                 System.out.println("Writing out merged batch for " + mergedRunFileName);
                 Debug.PPrint(out);
                 oos.writeObject(out.copyOf(out));
-                xs.add(out.copyOf(out));
 
                 out.clear(); // empty output buffer
             } catch (IOException io) {
