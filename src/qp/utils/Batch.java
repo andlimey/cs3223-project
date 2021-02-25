@@ -14,6 +14,14 @@ public class Batch implements Serializable {
     static int PageSize;      // Number of bytes per page
     ArrayList<Tuple> tuples;  // The tuples in the page
 
+    public Batch copyOf(Batch b) {
+        Batch copy = new Batch(b.MAX_SIZE);
+        for (Tuple t : b.tuples) {
+            copy.add(t);
+        }
+        return copy;
+    }
+
     /** Set number of bytes per page **/
     public static void setPageSize(int size) {
         PageSize = size;

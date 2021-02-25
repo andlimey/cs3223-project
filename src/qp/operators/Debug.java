@@ -188,6 +188,9 @@ public class Debug {
                 System.err.println("Debug:Class not found for reading file  " + fn);
                 System.exit(1);
             } catch (EOFException EOF) {
+                /** At this point incomplete page is sent and at next call it considered
+                 ** as end of file
+                 **/
                 System.out.println("EOF reached.");
                 break;
             } catch (IOException e) {
