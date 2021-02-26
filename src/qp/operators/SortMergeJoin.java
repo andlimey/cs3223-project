@@ -139,15 +139,15 @@ public class SortMergeJoin extends Join {
         if (!left.open() || !right.open()) return false;
 
         // External Sort
-//        ArrayList<String> leftSortedRunNames = generateSortedRuns(left, leftindex,"temp-left", leftBatchSize, leftindex);
-//        System.out.println("leftSortedRunNames: " + leftSortedRunNames);
-//        this.leftMergedRunName = mergeSortedRuns(leftSortedRunNames, "temp-left", 1, leftBatchSize).get(0);
+        ArrayList<String> leftSortedRunNames = generateSortedRuns(left, leftindex,"temp-left", leftBatchSize);
+        System.out.println("leftSortedRunNames: " + leftSortedRunNames);
+        this.leftMergedRunName = mergeSortedRuns(leftSortedRunNames, "temp-left", 1, leftBatchSize, leftindex).get(0);
 
         ArrayList<String> rightSortedRunNames = generateSortedRuns(right, rightindex,"temp-right", rightBatchSize);
         System.out.println("rightSortedRunNames: " + rightSortedRunNames);
         this.rightMergedRunName = mergeSortedRuns(rightSortedRunNames, "temp-right", 1, rightBatchSize, rightindex).get(0);
 
-//        System.out.println("leftMergedRunName: " + this.leftMergedRunName);
+        System.out.println("leftMergedRunName: " + this.leftMergedRunName);
         System.out.println("rightMergedRunName: " + this.rightMergedRunName);
 
         return true;
@@ -222,8 +222,18 @@ public class SortMergeJoin extends Join {
                 System.out.println("isOISClosed: " + isOISClosed);
                 isMergeComplete &= isOISClosed;
             }
+
+            for(int i = 0; i < buffers.length; i++) {
+                System.out.println("buffers[" + i + "]: is empty");
+                isMergeComplete &= buffers[i].isEmpty();
+            }
+
             System.out.println("isMergeComplete: " + isMergeComplete);
             if (isMergeComplete) {
+                for (int k = 0; k < buffers.length; k++) {
+                    assert buffers[k].isEmpty();
+                }
+                assert out.isEmpty();
                 System.out.print("Merge completed: " + mergedRunFileName + "\n\n");
                 continue;
             }
@@ -270,7 +280,7 @@ public class SortMergeJoin extends Join {
 
                             try {
                                 Batch data = (Batch) runs.get(availableRun).readObject();
-                                buffers[availableRun] = data;
+                                buffers[i] = data;
                             } catch (ClassNotFoundException cnf) {
                                 System.err.println("merge: Class not found for reading batch");
                                 System.exit(1);
@@ -296,7 +306,7 @@ public class SortMergeJoin extends Join {
 
                         try {
                             Batch data = (Batch) runs.get(availableRun).readObject();
-                            buffers[availableRun] = data;
+                            buffers[i] = data;
                         } catch (ClassNotFoundException cnf) {
                             System.err.println("merge: Class not found for reading batch");
                             System.exit(1);
