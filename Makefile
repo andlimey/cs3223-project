@@ -10,10 +10,10 @@ db:
 	# java RandomDB <tablename> <# of records>
 	# java ConvertTxtToTbl <tablename>
 	cp testcases/*det .; \
-	java RandomDB BILL 200; \
-	java RandomDB CART 200; \
-	java RandomDB CARTDETAILS 200; \
-	java RandomDB CUSTOMER 200; \
+	java RandomDB BILL 100; \
+	java RandomDB CART 100; \
+	java RandomDB CARTDETAILS 100; \
+	java RandomDB CUSTOMER 100; \
 	java ConvertTxtToTbl BILL; \
 	java ConvertTxtToTbl CART; \
 	java ConvertTxtToTbl CARTDETAILS; \

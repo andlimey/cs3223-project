@@ -230,10 +230,6 @@ public class SortMergeJoin extends Join {
 
             // Merge all with existing buffers to fill up output batch
             while (!out.isFull()) {
-                // Initialise minSoFar
-                Tuple minSoFar = null;
-                Batch chosen = null; // choose arbitrary batch
-
                 // Fill up buffers with inputs
                 for (int i = 0; i < buffers.length; i++) {
                     if (!buffers[i].isEmpty()) {
@@ -241,32 +237,83 @@ public class SortMergeJoin extends Join {
                         continue; // buffer is still loaded
                     }
 
-                    // find a batch from an open stream
-                    int availableRun = -1;
-                    for (int j = 0; j < eos.length; j++) {
-                        if (!eos[j]) {
-                            availableRun = j;
-                            break;
+                    // buffers[i] is non-empty
+                    if (i < eos.length) {
+                        if (!eos[i]) {
+                            // TODO: refactor out to reduce duplicate code
+                            try {
+                                Batch data = (Batch) runs.get(i).readObject();
+                                buffers[i] = data;
+                            } catch (ClassNotFoundException cnf) {
+                                System.err.println("merge: Class not found for reading batch");
+                                System.exit(1);
+                            } catch (EOFException EOF) {
+                                eos[i] = true; // Must remove the stream outside the loop
+                                System.out.println("OIS[" + i + "] has closed");
+                            } catch (IOException io) {
+                                System.err.println("merge: Error reading in batch");
+                                System.exit(1);
+                            }
+                            continue;
+                        } else if (eos[i]) {
+                            // find a batch from an open stream
+                            int availableRun = -1;
+                            for (int j = 0; j < eos.length; j++) {
+                                if (!eos[j]) {
+                                    availableRun = j;
+                                    break;
+                                }
+                            }
+
+                            // Does not exists an open ObjectInputStream for a run, stopping attempting to fill up buffers
+                            if (availableRun == -1) break;
+
+                            try {
+                                Batch data = (Batch) runs.get(availableRun).readObject();
+                                buffers[availableRun] = data;
+                            } catch (ClassNotFoundException cnf) {
+                                System.err.println("merge: Class not found for reading batch");
+                                System.exit(1);
+                            } catch (EOFException EOF) {
+                                eos[availableRun] = true; // Must remove the stream outside the loop
+                                System.out.println("OIS[" + availableRun + "] has closed");
+                            } catch (IOException io) {
+                                System.err.println("merge: Error reading in batch");
+                                System.exit(1);
+                            }
+                        }
+                    } else {
+                        int availableRun = -1;
+                        for (int j = 0; j < eos.length; j++) {
+                            if (!eos[j]) {
+                                availableRun = j;
+                                break;
+                            }
+                        }
+
+                        // Does not exists an open ObjectInputStream for a run, stopping attempting to fill up buffers
+                        if (availableRun == -1) break;
+
+                        try {
+                            Batch data = (Batch) runs.get(availableRun).readObject();
+                            buffers[availableRun] = data;
+                        } catch (ClassNotFoundException cnf) {
+                            System.err.println("merge: Class not found for reading batch");
+                            System.exit(1);
+                        } catch (EOFException EOF) {
+                            eos[availableRun] = true; // Must remove the stream outside the loop
+                            System.out.println("OIS[" + availableRun + "] has closed");
+                        } catch (IOException io) {
+                            System.err.println("merge: Error reading in batch");
+                            System.exit(1);
                         }
                     }
 
-                    // Does not exists an open ObjectInputStream for a run, stopping attempting to fill up buffers
-                    if (availableRun == -1) break;
-
-                    try {
-                        Batch data = (Batch) runs.get(availableRun).readObject();
-                        buffers[availableRun] = data;
-                    } catch (ClassNotFoundException cnf) {
-                        System.err.println("merge: Class not found for reading batch");
-                        System.exit(1);
-                    } catch (EOFException EOF) {
-                        eos[availableRun] = true; // Must remove the stream outside the loop
-                        System.out.println("OIS[" + availableRun + "] has closed");
-                    } catch (IOException io) {
-                        System.err.println("merge: Error reading in batch");
-                        System.exit(1);
-                    }
                 }
+
+                // Initialise minSoFar
+                Tuple minSoFar = null;
+                Batch chosen = null; // choose arbitrary batch
 
                 for (Batch b : buffers) {
                     if (!b.isEmpty()) {
@@ -311,7 +358,7 @@ public class SortMergeJoin extends Join {
             try {
                 System.out.println("Writing out merged batch for " + mergedRunFileName);
                 Debug.PPrint(out);
-                oos.writeObject(out.copyOf(out));
+                oos.writeObject(out.copyOf(out)); // TODO: refactor out
 
                 out.clear(); // empty output buffer
             } catch (IOException io) {
