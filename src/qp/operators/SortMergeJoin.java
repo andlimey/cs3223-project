@@ -59,21 +59,17 @@ public class SortMergeJoin extends Join {
         ArrayList<Tuple> runToBeStored = new ArrayList<>(runCapacity);
         ArrayList<String> runNames = new ArrayList<>(); // Tracks files of all sorted runs
         while (inbatch != null) {
-             if (runToBeStored.size() < runCapacity) {
-                 runToBeStored.addAll(inbatch.getAllTuplesCopy());
-                 // runCapacity is a multiple of batchsize
-                 assert runToBeStored.size() <= runCapacity;
-             } else {
+            // Buffers are full, sort the pages in a single run and write out
+             if (runToBeStored.size() == runCapacity) {
                  Collections.sort(runToBeStored, new TupleComparator(id));
                  String rfname = generateRunFileName(basename, 0, runnum);
                  WriteRunToFile(runToBeStored, runNames, rfname, inbatch.capacity());
 
-                 // Clear buffer and add current inbatch to buffer
                  runToBeStored.clear();
-                 runToBeStored.addAll(inbatch.getAllTuplesCopy());
-                 assert runToBeStored.size() <= runCapacity;
                  runnum++;
              }
+
+             runToBeStored.addAll(inbatch.getAllTuplesCopy());
              inbatch = base.next();
         }
 
@@ -143,22 +139,21 @@ public class SortMergeJoin extends Join {
         if (!left.open() || !right.open()) return false;
 
         // External Sort
-        ArrayList<String> leftSortedRunNames = generateSortedRuns(left, leftindex,"temp-left", leftBatchSize);
-        System.out.println("leftSortedRunNames: " + leftSortedRunNames);
-        this.leftMergedRunName = mergeSortedRuns(leftSortedRunNames, "temp-left", 1, leftBatchSize).get(0);
+//        ArrayList<String> leftSortedRunNames = generateSortedRuns(left, leftindex,"temp-left", leftBatchSize, leftindex);
+//        System.out.println("leftSortedRunNames: " + leftSortedRunNames);
+//        this.leftMergedRunName = mergeSortedRuns(leftSortedRunNames, "temp-left", 1, leftBatchSize).get(0);
 
         ArrayList<String> rightSortedRunNames = generateSortedRuns(right, rightindex,"temp-right", rightBatchSize);
         System.out.println("rightSortedRunNames: " + rightSortedRunNames);
-        this.rightMergedRunName = mergeSortedRuns(rightSortedRunNames, "temp-right", 1, rightBatchSize).get(0);
+        this.rightMergedRunName = mergeSortedRuns(rightSortedRunNames, "temp-right", 1, rightBatchSize, rightindex).get(0);
 
-        System.out.println("leftMergedRunName: " + this.leftMergedRunName);
+//        System.out.println("leftMergedRunName: " + this.leftMergedRunName);
         System.out.println("rightMergedRunName: " + this.rightMergedRunName);
 
         return true;
     }
 
-    private ArrayList<String> mergeSortedRuns(ArrayList<String> runFileNames, String basename, int passnum, int bsize) {
-//        if (runFileNames.size() <= numBuff-1) return runFileNames; // do not process last merge; for other sorting
+    private ArrayList<String> mergeSortedRuns(ArrayList<String> runFileNames, String basename, int passnum, int bsize, ArrayList<Integer> id) {
         if (runFileNames.size() == 1) return runFileNames; // merge to a single run
         ArrayList<String> mergedRuns = new ArrayList<>();
         String rfname;
@@ -167,7 +162,7 @@ public class SortMergeJoin extends Join {
         // Merge runs in batches of numBuff-1
         for (int i = 0, j = min(numBuff-1, runFileNames.size()); i < j; i = j, j = min(j+numBuff-1, runFileNames.size())) {
             rfname = generateRunFileName(basename, passnum, mergedRuns.size());
-            merge(new ArrayList<>(runFileNames.subList(i, j)), rfname, bsize);
+            merge(new ArrayList<>(runFileNames.subList(i, j)), rfname, bsize, id);
             System.out.println("Writing runfile: " + rfname);
             Debug.PPrint(rfname);
             mergedRuns.add(rfname);
@@ -178,10 +173,10 @@ public class SortMergeJoin extends Join {
             File f = new File(fname);
             f.delete();
         }
-        return mergeSortedRuns(mergedRuns, basename, passnum+1, bsize);
+        return mergeSortedRuns(mergedRuns, basename, passnum+1, bsize, id);
     }
 
-    private void merge(ArrayList<String> runNames, String mergedRunFileName, int bsize) {
+    private void merge(ArrayList<String> runNames, String mergedRunFileName, int bsize, ArrayList<Integer> id) {
         // TODO: if runNames.size() < numBuff-1, then all numBuffs should be used
         System.out.println("====== merge(): " + mergedRunFileName + "======");
         System.out.println("Merging runs: " + runNames);
@@ -215,45 +210,12 @@ public class SortMergeJoin extends Join {
         }
 
         // Track closed input streams
-        boolean[] eos = new boolean[numBuff-1];
+        boolean[] eos = new boolean[runs.size()];
         boolean isMergeComplete = false;
 
+        assert runs.size() <= buffers.length;
+
         while(!isMergeComplete) { // exists an unfinished input stream
-            assert runs.size() <= buffers.length;
-
-            // TODO: refactor this shiz out
-            // Load all buffers with input batches
-            for (int i = 0; i < runs.size(); i++) {
-                System.out.println("Load buffer for run [" + i + "]");
-                if (eos[i]) {
-                    System.out.println("OIS for run [" + i + "] is closed");
-                    continue; // stream has closed, skip it.
-                }
-                if (!buffers[i].isEmpty()) {
-                    System.out.println("Buffer[" + i + "] is not empty yet, do not read in new batch from OIS");
-                    continue; // buffer is still loaded
-                }
-                ObjectInputStream run = runs.get(i);
-                System.out.println("Attempt to read in batch for buffer[" + i + "]");
-                try {
-                    Batch data = (Batch) run.readObject();
-                    buffers[i] = data;
-                    //TODO: fill up all buffers. Currently only buffers (index-specific) for non-empty streams are used
-                    System.out.println("Read in batch: ");
-                    Debug.PPrint(buffers[i]);
-                } catch (ClassNotFoundException cnf) {
-                    System.err.println("merge: Class not found for reading batch");
-                    System.exit(1);
-                } catch (EOFException EOF) {
-                    eos[i] = true; // Must remove the stream outside the loop
-                    System.out.println("OIS[" + i + "] has closed");
-                } catch (IOException io) {
-                    System.err.println("merge: Error reading in batch");
-                    System.exit(1);
-                }
-            }
-
-            // TODO: This will change when all buffers are filled up.
             isMergeComplete = true;
             for(int i = 0; i < runs.size(); i++) { // only check eos for all runs
                 boolean isOISClosed = eos[i];
@@ -272,8 +234,40 @@ public class SortMergeJoin extends Join {
                 Tuple minSoFar = null;
                 Batch chosen = null; // choose arbitrary batch
 
+                // Fill up buffers with inputs
+                for (int i = 0; i < buffers.length; i++) {
+                    if (!buffers[i].isEmpty()) {
+                        System.out.println("Buffer[" + i + "] is not empty yet, do not read in new batch from OIS");
+                        continue; // buffer is still loaded
+                    }
 
-                // TODO: for empty buffers, attempt to read in new batch from its open OIS
+                    // find a batch from an open stream
+                    int availableRun = -1;
+                    for (int j = 0; j < eos.length; j++) {
+                        if (!eos[j]) {
+                            availableRun = j;
+                            break;
+                        }
+                    }
+
+                    // Does not exists an open ObjectInputStream for a run, stopping attempting to fill up buffers
+                    if (availableRun == -1) break;
+
+                    try {
+                        Batch data = (Batch) runs.get(availableRun).readObject();
+                        buffers[availableRun] = data;
+                    } catch (ClassNotFoundException cnf) {
+                        System.err.println("merge: Class not found for reading batch");
+                        System.exit(1);
+                    } catch (EOFException EOF) {
+                        eos[availableRun] = true; // Must remove the stream outside the loop
+                        System.out.println("OIS[" + availableRun + "] has closed");
+                    } catch (IOException io) {
+                        System.err.println("merge: Error reading in batch");
+                        System.exit(1);
+                    }
+                }
+
                 for (Batch b : buffers) {
                     if (!b.isEmpty()) {
                         minSoFar = b.get(0);
@@ -288,33 +282,26 @@ public class SortMergeJoin extends Join {
 
                 // Iterate through batches and find min tuple of all
                 for (int i = 0; i < buffers.length; i++) {
-                    if (!eos[i] && buffers[i].isEmpty() && i < runs.size()) {
-                        // Get batch from available run
-                        try {
-                            Batch data = (Batch) runs.get(i).readObject();
-                            buffers[i] = data;
-                        } catch (ClassNotFoundException cnf) {
-                            System.err.println("merge: Class not found for reading batch");
-                            System.exit(1);
-                        } catch (EOFException EOF) {
-                            eos[i] = true; // Must remove the stream outside the loop
-                            System.out.println("OIS[" + i + "] has closed");
-                        } catch (IOException io) {
-                            System.err.println("merge: Error reading in batch");
-                            System.exit(1);
-                        }
-                    }
-                    if(buffers[i].isEmpty()) continue; // skip empty buffers
+                    if (buffers[i].isEmpty()) continue; // skip empty buffers
                     Tuple batchMin = buffers[i].get(0);
-                    if (Tuple.compareTuples(minSoFar, batchMin) == 1) { // minSoFar > batchMin
+                    System.out.println("\nbuffers[" + i + "]");
+                    Debug.PPrint(buffers[i]);
+                    System.out.println("minSoFar: ");
+                    Debug.PPrint(minSoFar);
+                    System.out.println("batchMin: ");
+                    Debug.PPrint(batchMin);
+
+                    if (Tuple.compareTuples(minSoFar, batchMin, id, id) == 1) { // minSoFar > batchMin
                         minSoFar = batchMin;
                         chosen = buffers[i];
                     }
                 }
 
                 // chosen refers to the batch with the smallest 'minSoFar'
-                chosen.remove(chosen.indexOf(minSoFar));
                 out.add(minSoFar);
+                System.out.println("Selected minSoFar: ");
+                Debug.PPrint(minSoFar);
+                chosen.remove(0); // head's index is 0
             }
 
             if (out.isEmpty()) {
@@ -322,9 +309,6 @@ public class SortMergeJoin extends Join {
                 continue;
             }
             try {
-                /*
-                 TODO: write out batch objects or tuples? Scan operator reads in Tuples. This is just repeated work - read as tuples, convert to batch, vice versa
-                 */
                 System.out.println("Writing out merged batch for " + mergedRunFileName);
                 Debug.PPrint(out);
                 oos.writeObject(out.copyOf(out));
@@ -343,99 +327,99 @@ public class SortMergeJoin extends Join {
     }
 
 
-    @Override
-    public Batch next() {
-        if (eosl || eosr) {
-            return null;
-        }
-        outbatch = new Batch(batchsize);
-        ObjectInputStream leftIn = null;
-        ObjectInputStream rightIn = null;
-
-        try {
-            leftIn = new ObjectInputStream(new FileInputStream(leftMergedRunName));
-            rightIn = new ObjectInputStream(new FileInputStream(rightMergedRunName));
-        } catch (IOException io) {
-            System.err.println("SortMergeJoin:error in reading a mergedRun file");
-            System.exit(1);
-        }
-
-        while (!outbatch.isFull()) {
-            if (eosl || eosr) return outbatch;
-
-            // Load r or s from their batches if empty
-            //TODO: refactor
-            try {
-                if (lcurs >= leftbatch.size()) {
-                    leftbatch = (Batch) leftIn.readObject();
-                    lcurs = 0;
-                }
-            } catch (EOFException e) {
-                try {
-                    leftIn.close();
-                } catch (IOException io) {
-                    System.out.println("SortMergeJoin: Error in reading left merged run file");
-                }
-                eosl = true;
-            } catch (ClassNotFoundException c) {
-                System.out.println("SortMergeJoin: Error in deserialising left merged run file ");
-                System.exit(1);
-            } catch (IOException io) {
-                System.out.println("SortMergeJoin: Error in reading left merged run file");
-                System.exit(1);
-            }
-
-            try {
-                if (rcurs >= rightbatch.size()) {
-                    rightbatch = (Batch) rightIn.readObject();
-                    rcurs = 0;
-                }
-            } catch (EOFException e) {
-                try {
-                    rightIn.close();
-                } catch (IOException io) {
-                    System.out.println("SortMergeJoin: Error in reading right merged run file");
-                }
-                eosr = true;
-            } catch (ClassNotFoundException c) {
-                System.out.println("SortMergeJoin: Error in deserialising right merged run file ");
-                System.exit(1);
-            } catch (IOException io) {
-                System.out.println("SortMergeJoin: Error in reading right merged run file");
-                System.exit(1);
-            }
-
-            while (lcurs < leftbatch.size() && rcurs < rightbatch.size()) {
-                while (lcurs < leftbatch.size() && Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftindex, rightindex) == -1) {
-                    lcurs++;
-                }
-                if (lcurs >= leftbatch.size()) break;
-
-                while (rcurs < rightbatch.size() && Tuple.compareTuples(rightbatch.get(rcurs), leftbatch.get(lcurs), rightindex, leftindex) == -1) {
-                    rcurs++;
-                }
-                if (rcurs >= rightbatch.size()) break;
-
-
-                if (Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftindex, rightindex) == 0) {
-                    System.out.println("Tuples are equal");
-                    Debug.PPrint(leftbatch.get(lcurs));
-                    Debug.PPrint(rightbatch.get(rcurs));
-                    prevrcurs = rcurs;
-                    while(rcurs < rightbatch.size() && Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftindex, rightindex) == 0) {
-                        assert leftbatch.get(lcurs).checkJoin(rightbatch.get(rcurs), leftindex, rightindex);
-                        Tuple outtuple = leftbatch.get(lcurs).joinWith(rightbatch.get(rcurs));
-                        outbatch.add(outtuple);
-                        rcurs++;
-                        continue;
-                    }
-                    rcurs = prevrcurs;
-                    lcurs++;
-                }
-            }
-        }
-        return outbatch;
-    }
+//    @Override
+//    public Batch next() {
+//        if (eosl || eosr) {
+//            return null;
+//        }
+//        outbatch = new Batch(batchsize);
+//        ObjectInputStream leftIn = null;
+//        ObjectInputStream rightIn = null;
+//
+//        try {
+//            leftIn = new ObjectInputStream(new FileInputStream(leftMergedRunName));
+//            rightIn = new ObjectInputStream(new FileInputStream(rightMergedRunName));
+//        } catch (IOException io) {
+//            System.err.println("SortMergeJoin:error in reading a mergedRun file");
+//            System.exit(1);
+//        }
+//
+//        while (!outbatch.isFull()) {
+//            if (eosl || eosr) return outbatch;
+//
+//            // Load r or s from their batches if empty
+//            //TODO: refactor
+//            try {
+//                if (lcurs >= leftbatch.size()) {
+//                    leftbatch = (Batch) leftIn.readObject();
+//                    lcurs = 0;
+//                }
+//            } catch (EOFException e) {
+//                try {
+//                    leftIn.close();
+//                } catch (IOException io) {
+//                    System.out.println("SortMergeJoin: Error in reading left merged run file");
+//                }
+//                eosl = true;
+//            } catch (ClassNotFoundException c) {
+//                System.out.println("SortMergeJoin: Error in deserialising left merged run file ");
+//                System.exit(1);
+//            } catch (IOException io) {
+//                System.out.println("SortMergeJoin: Error in reading left merged run file");
+//                System.exit(1);
+//            }
+//
+//            try {
+//                if (rcurs >= rightbatch.size()) {
+//                    rightbatch = (Batch) rightIn.readObject();
+//                    rcurs = 0;
+//                }
+//            } catch (EOFException e) {
+//                try {
+//                    rightIn.close();
+//                } catch (IOException io) {
+//                    System.out.println("SortMergeJoin: Error in reading right merged run file");
+//                }
+//                eosr = true;
+//            } catch (ClassNotFoundException c) {
+//                System.out.println("SortMergeJoin: Error in deserialising right merged run file ");
+//                System.exit(1);
+//            } catch (IOException io) {
+//                System.out.println("SortMergeJoin: Error in reading right merged run file");
+//                System.exit(1);
+//            }
+//
+//            while (lcurs < leftbatch.size() && rcurs < rightbatch.size()) {
+//                while (lcurs < leftbatch.size() && Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftindex, rightindex) == -1) {
+//                    lcurs++;
+//                }
+//                if (lcurs >= leftbatch.size()) break;
+//
+//                while (rcurs < rightbatch.size() && Tuple.compareTuples(rightbatch.get(rcurs), leftbatch.get(lcurs), rightindex, leftindex) == -1) {
+//                    rcurs++;
+//                }
+//                if (rcurs >= rightbatch.size()) break;
+//
+//
+//                if (Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftindex, rightindex) == 0) {
+//                    System.out.println("Tuples are equal");
+//                    Debug.PPrint(leftbatch.get(lcurs));
+//                    Debug.PPrint(rightbatch.get(rcurs));
+//                    prevrcurs = rcurs;
+//                    while(rcurs < rightbatch.size() && Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftindex, rightindex) == 0) {
+//                        assert leftbatch.get(lcurs).checkJoin(rightbatch.get(rcurs), leftindex, rightindex);
+//                        Tuple outtuple = leftbatch.get(lcurs).joinWith(rightbatch.get(rcurs));
+//                        outbatch.add(outtuple);
+//                        rcurs++;
+//                        continue;
+//                    }
+//                    rcurs = prevrcurs;
+//                    lcurs++;
+//                }
+//            }
+//        }
+//        return outbatch;
+//    }
 
     @Override
     public boolean close() {
