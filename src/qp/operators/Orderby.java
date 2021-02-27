@@ -19,6 +19,9 @@ public class Orderby extends Operator {
     int passNum = 0;
     int maxTuples;                 // Max number of tuples the main memory can store
     ArrayList<String> runNames = new ArrayList<>();
+    ArrayList<ObjectInputStream> runs = new ArrayList<>();
+    Batch[] buffers = new Batch[numBuffer-1];
+    boolean[] endOfStream;
 
     /**
      * The following fields are requied during execution
@@ -66,6 +69,7 @@ public class Orderby extends Operator {
         StoreIndexToOrderBy();
         GenerateSortedRuns();
         MergeSortedRuns();
+        PrepareLastRun();
         return true;
     }
 
@@ -87,6 +91,7 @@ public class Orderby extends Operator {
      **/
     private void GenerateSortedRuns() {
         maxTuples = numBuffer * batchsize;
+        numRuns = 0;
         ArrayList<Tuple> mainMemory = new ArrayList<>(maxTuples);   // Simulate main memory
         inbatch = base.next();
 
@@ -106,7 +111,6 @@ public class Orderby extends Operator {
             SortTuplesInMemory(mainMemory);
             WriteTuplesToFile(mainMemory, passNum, numRuns);
             mainMemory.clear();
-            numRuns++;
         }
     }
 
@@ -181,6 +185,31 @@ public class Orderby extends Operator {
         }
     }
 
+    // TODO: Refactor
+    private void PrepareLastRun() {
+        System.out.println("Preparing Last Merge: " + runNames);
+
+        // Init buffers for merging
+        buffers = new Batch[numBuffer-1];
+        for (int i = 0; i < numBuffer - 1; i++) {
+            buffers[i] = new Batch(batchsize);
+        }
+
+        // Init streams for runs
+        runs = new ArrayList<>();
+        for (String rname : runNames) {
+            try {
+                ObjectInputStream input = new ObjectInputStream(new FileInputStream(rname));
+                runs.add(input);
+            } catch (IOException io) {
+                System.out.println("Error reading in file: " + rname);
+                System.exit(1);
+            }
+        }
+
+        endOfStream = new boolean[runs.size()];
+    }
+
     private void MergeKArrays(ArrayList<String> runNames, String mergedFileName) {
         System.out.println("====== merge(): " + mergedFileName + "======");
         System.out.println("Merging runs " + runNames);
@@ -194,14 +223,14 @@ public class Orderby extends Operator {
         }
 
         // Init buffers for merging
-        Batch outputBuffer = new Batch(batchsize);  // 1 buffer reserved for output
-        Batch[] buffers = new Batch[numBuffer-1];
+        outbatch = new Batch(batchsize);  // 1 buffer reserved for output
+        buffers = new Batch[numBuffer-1];
         for (int i = 0; i < numBuffer - 1; i++) {
             buffers[i] = new Batch(batchsize);
         }
 
         // Init streams for runs
-        ArrayList<ObjectInputStream> runs = new ArrayList<>();
+        runs = new ArrayList<>();
         for (String rname : runNames) {
             try {
                 ObjectInputStream input = new ObjectInputStream(new FileInputStream(rname));
@@ -212,38 +241,16 @@ public class Orderby extends Operator {
             }
         }
 
-        boolean[] endOfStream = new boolean[runs.size()];
+        endOfStream = new boolean[runs.size()];
         boolean isMergeComplete = false;
 
         assert runs.size() <= buffers.length;
 
         while (!isMergeComplete) {
             // Merge buffers into output buffer until full or until all buffers are empty
-            while (!outputBuffer.isFull()) {
+            while (!outbatch.isFull()) {
                 // Read tuples into buffers
-                for (int i = 0; i < buffers.length; i++) {
-                    if (!buffers[i].isEmpty()) {
-                        System.out.println("Buffer " + i + " still contain tuples. Don't read in new batch yet");
-                        continue;
-                    }
-
-                    // buffers[i] is not empty
-                    if (i < endOfStream.length) {
-                        if (!endOfStream[i]) {
-                            ReadRecordsIntoChosenBuffer(runs, buffers, endOfStream, i);
-                        } else {
-                            int availableRun = FindAvailableRunNum(endOfStream);
-
-                            // All runs are closed. Stop filling up buffers
-                            if (availableRun == -1) break;
-                            ReadRecordsIntoChosenBuffer(runs, buffers, endOfStream, availableRun);
-                        }
-                    } else {
-                        int availableRun = FindAvailableRunNum(endOfStream);
-                        if (availableRun == -1) break;
-                        ReadRecordsIntoChosenBuffer(runs, buffers, endOfStream, availableRun);
-                    }
-                }
+                ReadTuplesIntoBuffer(runs, buffers, endOfStream);
 
                 // Perform K-way merge
                 Tuple chosenTuple = null;
@@ -277,19 +284,19 @@ public class Orderby extends Operator {
 
                 // Add minimum to output buffer
                 chosenBatch.remove(0);
-                outputBuffer.add(chosenTuple);
+                outbatch.add(chosenTuple);
             }
 
-            if (outputBuffer.isEmpty()) {
+            if (outbatch.isEmpty()) {
                 System.out.println("Output buffer is empty. Don't write");
                 continue;
             }
 
             // Write out to file
             try {
-                Debug.PPrint(outputBuffer);
-                outputStream.writeObject(outputBuffer);
-                outputBuffer.clear();
+                Debug.PPrint(outbatch);
+                outputStream.writeObject(outbatch);
+                outbatch.clear();
             } catch (IOException io) {
                 System.out.println("Error writing to new run");
                 System.exit(1);
@@ -307,6 +314,32 @@ public class Orderby extends Operator {
         } catch (IOException e) {
             System.out.println("Error closing stream");
             System.exit(1);
+        }
+    }
+
+    private void ReadTuplesIntoBuffer(ArrayList<ObjectInputStream> runs, Batch[] buffers, boolean[] eos) {
+        for (int i = 0; i < buffers.length; i++) {
+            if (!buffers[i].isEmpty()) {
+                System.out.println("Buffer " + i + " still contain tuples. Don't read in new batch yet");
+                continue;
+            }
+
+            // buffers[i] is not empty
+            if (i < endOfStream.length) {
+                if (!endOfStream[i]) {
+                    ReadRecordsIntoChosenBuffer(runs, buffers, endOfStream, i);
+                } else {
+                    int availableRun = FindAvailableRunNum(endOfStream);
+
+                    // All runs are closed. Stop filling up buffers
+                    if (availableRun == -1) break;
+                    ReadRecordsIntoChosenBuffer(runs, buffers, endOfStream, availableRun);
+                }
+            } else {
+                int availableRun = FindAvailableRunNum(endOfStream);
+                if (availableRun == -1) break;
+                ReadRecordsIntoChosenBuffer(runs, buffers, endOfStream, availableRun);
+            }
         }
     }
 
@@ -363,15 +396,53 @@ public class Orderby extends Operator {
     }
 
     /**
-     * Read next tuple from operator
+     *  Determine next output item
+     *  Read new item from the correct run file
      */
     public Batch next() {
-        // Determine next output item
-        // Read new item from the correct run file
-        return null;
-    }
+        if (CheckIfMergeComplete(endOfStream, buffers)) {
+            return null;
+        }
+        outbatch = new Batch(batchsize);  // 1 buffer reserved for output
+        while (!outbatch.isFull()) {
+            // Read tuples into buffers
+            ReadTuplesIntoBuffer(runs, buffers, endOfStream);
 
-    private void MergeLast() {
+            // Perform K-way merge
+            Tuple chosenTuple = null;
+            Batch chosenBatch = null;
+
+            for (Batch b : buffers) {
+                if (!b.isEmpty()) {
+                    chosenTuple = b.get(0);
+                    chosenBatch = b;
+                    break;
+                }
+            }
+
+            if (chosenTuple == null) {
+                // Input buffers are all empty and output buffer is not full. Break and write out.
+                break;
+            }
+
+            // Find minimum/maximum
+            for (int i = 0; i < buffers.length; i++) {
+                if (buffers[i].isEmpty()) continue;
+
+                Tuple current = buffers[i].get(0);
+                boolean shouldCurrentBeChosen = ShouldCurrentTupleBeChosen(chosenTuple, current);
+
+                if (shouldCurrentBeChosen) {
+                    chosenTuple = current;
+                    chosenBatch = buffers[i];
+                }
+            }
+
+            // Add minimum to output buffer
+            chosenBatch.remove(0);
+            outbatch.add(chosenTuple);
+        }
+        return outbatch;
     }
 
     /**
@@ -379,6 +450,10 @@ public class Orderby extends Operator {
      */
     public boolean close() {
         // Destroy remaining run files
+        for (String filename : runNames) {
+            File f = new File(filename);
+            f.delete();
+        }
         return true;
     }
 
