@@ -253,6 +253,9 @@ public class Orderby extends Operator {
                 if (chosenTuple == null) {
                     // Input buffers are all empty and output buffer is not full. Break and write out.
                     break;
+                } else {
+                    System.out.println("Current chosen tuple is: ");
+                    Debug.PPrint(chosenTuple);
                 }
 
                 // Find minimum/maximum
@@ -268,10 +271,14 @@ public class Orderby extends Operator {
                     }
                 }
 
-                // Add minimum to output buffer
-                System.out.print("Minimum tuple chosen is: ");
+                // Add chosen to output buffer
+                System.out.print("Chosen tuple is: ");
                 Debug.PPrint(chosenTuple);
+
                 outbatch.add(chosenTuple);
+                System.out.println("Current outbatch is: ");
+                Debug.PPrint(outbatch);
+
                 chosenBatch.remove(0);
             }
 
@@ -282,14 +289,18 @@ public class Orderby extends Operator {
 
             // Write out to file
             try {
+                System.out.println("Outbatch to write out is: ");
                 Debug.PPrint(outbatch);
-                outputStream.writeObject(outbatch);
+                outputStream.writeObject(outbatch.copyOf(outbatch));
                 outbatch.clear();
             } catch (IOException io) {
                 System.out.println("Error writing to new run");
                 System.exit(1);
             }
         }
+
+        System.out.println("Printing file name");
+        Debug.PPrint(mergedFileName);
 
         try {
             outputStream.close();
@@ -322,6 +333,12 @@ public class Orderby extends Operator {
     }
 
     private void ReadTuplesIntoBuffer(ArrayList<ObjectInputStream> runs, Batch[] buffers, boolean[] eos) {
+        System.out.println("==========Before==========");
+        for (int i = 0; i < buffers.length; i++) {
+            System.out.println("Buffer " + i + ":");
+            Debug.PPrint(buffers[i]);
+        }
+
         for (int i = 0; i < buffers.length; i++) {
             if (!buffers[i].isEmpty()) {
                 System.out.println("Buffer " + i + " still contain tuples. Don't read in new batch yet");
@@ -331,32 +348,51 @@ public class Orderby extends Operator {
             // buffers[i] is not empty
             if (i < eos.length) {
                 if (!eos[i]) {
-                    ReadRecordsIntoChosenBuffer(runs, buffers, eos, i);
+                    System.out.println("eos[i] is false");
+                    System.out.println("Before reading");
+                    System.out.println("Buffer " + i + ":");
+                    Debug.PPrint(buffers[i]);
+
+                    ReadRecordsIntoChosenBuffer(runs, buffers, eos, i, i);
+
+                    System.out.println("After reading");
+                    System.out.println("Buffer " + i + ":");
+                    Debug.PPrint(buffers[i]);
                 } else {
                     int availableRun = FindAvailableRunNum(eos);
 
                     // All runs are closed. Stop filling up buffers
                     if (availableRun == -1) break;
-                    ReadRecordsIntoChosenBuffer(runs, buffers, eos, availableRun);
+
+                    ReadRecordsIntoChosenBuffer(runs, buffers, eos, i, availableRun);
                 }
             } else {
                 int availableRun = FindAvailableRunNum(eos);
                 if (availableRun == -1) break;
-                ReadRecordsIntoChosenBuffer(runs, buffers, eos, availableRun);
+
+                ReadRecordsIntoChosenBuffer(runs, buffers, eos, i, availableRun);
+
             }
+        }
+
+        System.out.println("==========After==========");
+        for (int i = 0; i < buffers.length; i++) {
+            System.out.println("Buffer " + i + ":");
+            Debug.PPrint(buffers[i]);
         }
     }
 
-    private void ReadRecordsIntoChosenBuffer(ArrayList<ObjectInputStream> runs, Batch[] buffers, boolean[] eos, int chosen) {
+    private void ReadRecordsIntoChosenBuffer(ArrayList<ObjectInputStream> runs, Batch[] buffers, boolean[] eos, int bufferNum, int runNum) {
+        assert(buffers[bufferNum].isEmpty());
         try {
-            Batch data = (Batch) runs.get(chosen).readObject();
-            buffers[chosen] = data;
+            Batch data = (Batch) runs.get(runNum).readObject();
+            buffers[bufferNum] = data;
         } catch (ClassNotFoundException e) {
             System.out.println("Class not found for reading batch");
             System.exit(1);
         } catch (EOFException eof) {
-            System.out.println("EOF reached for this run: " + chosen);
-            eos[chosen] = true;
+            System.out.println("EOF reached for this run: " + runNum);
+            eos[runNum] = true;
         } catch (IOException io) {
             System.out.println("Error reading in batch.");
             System.exit(1);
