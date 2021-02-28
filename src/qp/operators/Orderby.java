@@ -6,6 +6,7 @@ import java.io.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static java.lang.Math.copySign;
 import static java.lang.Math.min;
 
 public class Orderby extends Operator {
@@ -65,6 +66,9 @@ public class Orderby extends Operator {
         int tuplesize = schema.getTupleSize();
         batchsize = Batch.getPageSize() / tuplesize;
 
+        System.out.println("Size of tuple is: " + tuplesize);
+        System.out.println("Batch size is: " + batchsize);
+
         if (!base.open()) return false;
         StoreIndexToOrderBy();
         GenerateSortedRuns();
@@ -96,6 +100,7 @@ public class Orderby extends Operator {
         inbatch = base.next();
 
         while (inbatch != null) {
+            Debug.PPrint(inbatch);
             if (mainMemory.size() == maxTuples) {
                 SortTuplesInMemory(mainMemory);
                 WriteTuplesToFile(mainMemory, passNum, numRuns);
@@ -111,6 +116,7 @@ public class Orderby extends Operator {
             SortTuplesInMemory(mainMemory);
             WriteTuplesToFile(mainMemory, passNum, numRuns);
             mainMemory.clear();
+            numRuns++;
         }
     }
 
@@ -165,33 +171,37 @@ public class Orderby extends Operator {
 
         ArrayList<String> mergedRuns = new ArrayList<>();
 
-        // While condition ensures that last step is reserved for next()
-        while (numRuns > numBuffersForMerge) {
-            int counter = 0;
+        // Constrains the number of runs until the last step.
+        int runCounter = (int) Math.ceil(Math.log(numRuns) / Math.log(numBuffersForMerge)) - 1;
+
+        for (int i = 0; i < runCounter; i++) {
+            numRuns = 0;    // Reset to 0 for the next pass.
+            passNum++;
+            System.out.println("Run names being merged are: " + runNames);
 
             // Number of runs to merge is constrained by number of buffers available
-            // i and j are used to retrieve the set of runs to merge
-            for (int i = 0, j = numBuffersForMerge; i < j; i = j, j = min(j + numBuffersForMerge, runNames.size())) {
-                ArrayList<String> runsToMerge = new ArrayList<>(runNames.subList(i, j));
-                String mergedFileName = GenerateFileName(passNum+1, counter);
+            // j and k are used to retrieve the set of runs to merge
+            for (int j = 0, k = min(numBuffersForMerge, runNames.size()); j < k; j = k, k = min(k + numBuffersForMerge, runNames.size())) {
+                ArrayList<String> runsToMerge = new ArrayList<>(runNames.subList(j, k));
+                String mergedFileName = GenerateFileName(passNum, numRuns);
                 MergeKArrays(runsToMerge, mergedFileName);
                 mergedRuns.add(mergedFileName);
 
-                counter++;
+                numRuns++;
             }
-            passNum++;
 
             // Deletes runs already merged in current pass.
             for (String filename : runNames) {
                 File f = new File(filename);
                 f.delete();
             }
+            System.out.println("Merged Runs are: " + mergedRuns);
+            runNames.clear();
             runNames.addAll(mergedRuns);
             mergedRuns.clear();
         }
     }
 
-    // TODO: Refactor
     private void PrepareLastRun() {
         System.out.println("Preparing Last Merge: " + runNames);
         PrepareSortedRuns(runNames);
@@ -220,6 +230,7 @@ public class Orderby extends Operator {
             isMergeComplete = CheckIfMergeComplete(endOfStream, buffers);
             if (isMergeComplete) {
                 System.out.println("Merge completed: " + mergedFileName + "\n");
+                continue;
             }
 
             // Merge buffers into output buffer until full or until all buffers are empty
@@ -258,8 +269,10 @@ public class Orderby extends Operator {
                 }
 
                 // Add minimum to output buffer
-                chosenBatch.remove(0);
+                System.out.print("Minimum tuple chosen is: ");
+                Debug.PPrint(chosenTuple);
                 outbatch.add(chosenTuple);
+                chosenBatch.remove(0);
             }
 
             if (outbatch.isEmpty()) {
@@ -379,7 +392,7 @@ public class Orderby extends Operator {
             }
         }
         for (int i = 0; i < buffers.length; i++) {
-            if (buffers[i].isEmpty()) {
+            if (!buffers[i].isEmpty()) {
                 return false;
             }
         }
