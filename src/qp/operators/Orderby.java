@@ -48,6 +48,10 @@ public class Orderby extends Operator {
         return base;
     }
 
+    public int getNumBuffer() {
+        return numBuffer;
+    }
+
     public boolean isDesc() { return isDesc; }
 
     public void setBase(Operator base) {
@@ -137,6 +141,7 @@ public class Orderby extends Operator {
 
     private void WriteTuplesToFile(ArrayList<Tuple> mainMemory, int passNum, int runNum) {
         String filename = GenerateFileName(passNum, runNum);
+
         try {
             ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(filename));
 
@@ -191,10 +196,8 @@ public class Orderby extends Operator {
             }
 
             // Deletes runs already merged in current pass.
-            for (String filename : runNames) {
-                File f = new File(filename);
-                f.delete();
-            }
+            DeleteFiles(runNames);
+
             System.out.println("Merged Runs are: " + mergedRuns);
             runNames.clear();
             runNames.addAll(mergedRuns);
@@ -435,6 +438,15 @@ public class Orderby extends Operator {
         return true;
     }
 
+    private void DeleteFiles(ArrayList<String> fileNames) {
+        for (String filename : fileNames) {
+            File f = new File(filename);
+            System.out.println(f.getAbsolutePath());
+            boolean result = f.delete();
+            System.out.println(result);
+        }
+    }
+
     /**
      *  Determine next output item
      *  Read new item from the correct run file
@@ -490,10 +502,7 @@ public class Orderby extends Operator {
      */
     public boolean close() {
         // Destroy remaining run files
-        for (String filename : runNames) {
-            File f = new File(filename);
-            f.delete();
-        }
+        DeleteFiles(runNames);
         return true;
     }
 

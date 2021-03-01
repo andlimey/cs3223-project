@@ -83,9 +83,20 @@ public class PlanCost {
         return 0;
     }
 
-    // TODO: Temp method
     protected long getStatistics(Orderby node) {
-        return calculateCost(node.getBase());
+        long tuples = calculateCost(node.getBase());
+
+        long tupleSize = node.getSchema().getTupleSize();
+        long capacity = Math.max(1, Batch.getPageSize() / tupleSize);
+        long numPages = (long) Math.ceil(((double) tuples) / (double) capacity);
+        long numBuffers = node.getNumBuffer();
+
+        long numRuns = numPages / numBuffers;
+        long numPasses = 1 + (long) (Math.ceil(Math.log(numRuns) / Math.log(numBuffers - 1)));
+
+        cost += (2 * numPages * numPasses);
+
+        return tuples;
     }
 
     /**
