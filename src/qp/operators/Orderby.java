@@ -3,6 +3,10 @@ package qp.operators;
 import qp.utils.*;
 
 import java.io.*;
+import java.nio.file.DirectoryNotEmptyException;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -441,9 +445,18 @@ public class Orderby extends Operator {
     private void DeleteFiles(ArrayList<String> fileNames) {
         for (String filename : fileNames) {
             File f = new File(filename);
-            System.out.println(f.getAbsolutePath());
-            boolean result = f.delete();
-            System.out.println(result);
+            try {
+                Files.deleteIfExists(Paths.get(f.getAbsolutePath()));
+            }
+            catch(NoSuchFileException e) {
+                System.out.println("No such file/directory exists");
+            }
+            catch(DirectoryNotEmptyException e) {
+                System.out.println("Directory is not empty.");
+            }
+            catch(IOException e) {
+                System.out.println("Invalid permissions.");
+            }
         }
     }
 
