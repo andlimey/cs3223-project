@@ -6,7 +6,39 @@ package qp.operators;
 
 import qp.utils.*;
 
+import java.io.EOFException;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+
 public class Debug {
+
+    public static void PPrint(String fn) {
+        ObjectInputStream in = null;
+        System.out.println("Printing out serialised file of Batch objects: " + fn);
+        try {
+            in = new ObjectInputStream(new FileInputStream(fn));
+        } catch (Exception e) {
+            System.err.println(" Error reading " + fn);
+            System.exit(1);
+        }
+
+        while (true) {
+            try {
+                Batch data = (Batch) in.readObject();
+                Debug.PPrint(data);
+            } catch (ClassNotFoundException cnf) {
+                System.err.println("Debug:Class not found for reading file  " + fn);
+                System.exit(1);
+            } catch (EOFException EOF) {
+                System.out.println("EOF reached.");
+                break;
+            } catch (IOException e) {
+                System.err.println("Debug:Error reading " + fn);
+                System.exit(1);
+            }
+        }
+    }
 
     /**
      * print the attribute

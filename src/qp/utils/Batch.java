@@ -6,6 +6,7 @@ package qp.utils;
 
 import java.util.ArrayList;
 import java.io.Serializable;
+import java.util.Collection;
 
 public class Batch implements Serializable {
 
@@ -27,6 +28,14 @@ public class Batch implements Serializable {
     public Batch(int numtuple) {
         MAX_SIZE = numtuple;
         tuples = new ArrayList<>(MAX_SIZE);
+    }
+
+    public Batch copyOf(Batch b) {
+        Batch copy = new Batch(b.MAX_SIZE);
+        for (Tuple t : b.tuples) {
+            copy.add(t);
+        }
+        return copy;
     }
 
     /** Insert the record in page at next free location **/
@@ -79,5 +88,9 @@ public class Batch implements Serializable {
             return true;
         else
             return false;
+    }
+
+    public ArrayList<Tuple> getAllTuplesCopy() {
+        return new ArrayList<>(tuples);
     }
 }
