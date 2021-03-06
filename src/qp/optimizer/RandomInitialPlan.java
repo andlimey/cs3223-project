@@ -57,11 +57,6 @@ public class RandomInitialPlan {
             System.exit(1);
         }
 
-        if (sqlquery.getGroupByList().size() > 0) {
-            System.err.println("GroupBy is not implemented.");
-            System.exit(1);
-        }
-
         tab_op_hash = new HashMap<>();
         createScanOp();
         createSelectOp();
@@ -69,6 +64,11 @@ public class RandomInitialPlan {
             createJoinOp();
         }
         createProjectOp();
+
+        if (sqlquery.getGroupByList().size() > 0) {
+            createGroupbyOp();
+        }
+
         if (sqlquery.getOrderByList().size() > 0) {
             createOrderbyOp();
         }
@@ -192,6 +192,21 @@ public class RandomInitialPlan {
             root = new Project(base, projectlist, OpType.PROJECT);
             Schema newSchema = base.getSchema().subSchema(projectlist);
             root.setSchema(newSchema);
+        }
+    }
+
+    public void createGroupbyOp() {
+        Operator base = root;
+        if (!groupbylist.isEmpty()) {
+            // Attribute in SELECT clause must appear in Group By clause or is a primary key.
+            for (Attribute attr : projectlist) {
+                if (!(attr.isPrimaryKey() || groupbylist.contains(attr))) {
+                    System.out.println("Attribute does not appear in Group By clause and is not a primary key.");
+                    System.exit(1);
+                }
+            }
+            root = new Groupby(base, groupbylist, OpType.GROUPBY);
+            root.setSchema(base.getSchema());
         }
     }
 
