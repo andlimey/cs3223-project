@@ -94,12 +94,12 @@ public class SortMergeJoin extends Join {
     private void WriteRunToFile(ArrayList<Tuple> runToBeStored, ArrayList<String> runNames, String rfname, int bsize) {
         try {
             ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(rfname));
-            System.out.println("Writing to " + rfname + ": ");
+//            System.out.println("Writing to " + rfname + ": ");
 
             Batch newbatch = new Batch(bsize);
             for (Tuple t : runToBeStored) {
                 newbatch.add(t);
-                Debug.PPrint(t);
+//                Debug.PPrint(t);
             }
             out.writeObject(newbatch);
             runNames.add(rfname);
@@ -456,45 +456,41 @@ public class SortMergeJoin extends Join {
                     (eosr) || // for the case where left batch could still have tuples that can join with rightPartition
                     (Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftAttrIndex, rightAttrIndex) == -1)
             ) {
-                System.out.println("here2");
                 lcurs++;
                 if (lcurs >= leftbatch.size()) break;
                 if (!rightPartition.isEmpty() && Tuple.compareTuples(leftbatch.get(lcurs), rightPartition.get(0), leftAttrIndex, rightAttrIndex) == 0) {
                     for (Tuple r : rightPartition) {
                         assert leftbatch.get(lcurs).checkJoin(rightPartition.get(0), leftAttrIndex, rightAttrIndex);
-                        System.out.println("Joining these tuples");
-                        Debug.PPrint(leftbatch.get(lcurs));
-                        Debug.PPrint(r);
+//                        System.out.println("Joining these tuples");
+//                        Debug.PPrint(leftbatch.get(lcurs));
+//                        Debug.PPrint(r);
                         outbatch.add(leftbatch.get(lcurs).joinWith(r));
                     }
                 } else {
                     // No match on LHS, clear rightPartition
-                    System.out.println("No match for LHS and rightPartition[0]");
-                    Debug.PPrint(leftbatch.get(lcurs));
-                    Debug.PPrint(rightbatch.get(0));
-                    System.out.println("Clearing rightPartition");
+//                    System.out.println("No match for LHS and rightPartition[0]");
+//                    Debug.PPrint(leftbatch.get(lcurs));
+//                    Debug.PPrint(rightbatch.get(0));
+//                    System.out.println("Clearing rightPartition");
                     rightPartition.clear();
                 }
             }
             if (lcurs >= leftbatch.size()) continue;
 
             while (rcurs < rightbatch.size() && Tuple.compareTuples(rightbatch.get(rcurs), leftbatch.get(lcurs), rightAttrIndex, leftAttrIndex) == -1) {
-                System.out.println("rcurs: " + rcurs);
-                System.out.println("rightbatch.size(): " + rightbatch.size());
-                System.out.println("here3");
                 rcurs++;
             }
             if (rcurs >= rightbatch.size()) continue;
 
             if (Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftAttrIndex, rightAttrIndex) == 0) {
-                System.out.println("Tuples match");
-                Debug.PPrint(leftbatch.get(lcurs));
-                Debug.PPrint(rightbatch.get(rcurs));
+//                System.out.println("Tuples match");
+//                Debug.PPrint(leftbatch.get(lcurs));
+//                Debug.PPrint(rightbatch.get(rcurs));
                 if ( rightPartition.isEmpty() || (!rightPartition.isEmpty() && Tuple.compareTuples(rightbatch.get(rcurs), rightPartition.get(0), rightAttrIndex, rightAttrIndex) == 0)) {
-                    System.out.println("Added right tuple to rightPartition");
+//                    System.out.println("Added right tuple to rightPartition");
                     rightPartition.add(rightbatch.get(rcurs));
                 } else {
-                    System.out.println("Reset rightPartition");
+//                    System.out.println("Reset rightPartition");
                     rightPartition.clear();
                 }
 
