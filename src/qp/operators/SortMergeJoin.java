@@ -191,7 +191,6 @@ public class SortMergeJoin extends Join {
     }
 
     private void merge(ArrayList<String> runNames, String mergedRunFileName, int bsize, int[] attrIndex) {
-        // TODO: if runNames.size() < numBuff-1, then all numBuffs should be used
         System.out.println("====== merge(): " + mergedRunFileName + "======");
         System.out.println("Merging runs: " + runNames);
 
@@ -421,6 +420,7 @@ public class SortMergeJoin extends Join {
                     System.out.println("SortMergeJoin: Error in reading left merged run file");
                 }
                 eosl = true;
+                // once leftIn is empty no other join tuples expected
                 return outbatch;
             } catch (ClassNotFoundException c) {
                 System.out.println("SortMergeJoin: Error in deserialising left merged run file ");
@@ -442,7 +442,8 @@ public class SortMergeJoin extends Join {
                     System.out.println("SortMergeJoin: Error in reading right merged run file");
                 }
                 eosr = true;
-                return outbatch;
+                // don't return yet; left batch could still have tuples that can join with rightPartition
+                // return outbatch;
             } catch (ClassNotFoundException c) {
                 System.out.println("SortMergeJoin: Error in deserialising right merged run file ");
                 System.exit(1);
@@ -451,17 +452,20 @@ public class SortMergeJoin extends Join {
                 System.exit(1);
             }
 
-            while (lcurs < leftbatch.size() && Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftAttrIndex, rightAttrIndex) == -1) {
+            while (lcurs < leftbatch.size() &&
+                    (eosr) || // for the case where left batch could still have tuples that can join with rightPartition
+                    (Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftAttrIndex, rightAttrIndex) == -1)
+            ) {
                 System.out.println("here2");
                 lcurs++;
                 if (lcurs >= leftbatch.size()) break;
                 if (!rightPartition.isEmpty() && Tuple.compareTuples(leftbatch.get(lcurs), rightPartition.get(0), leftAttrIndex, rightAttrIndex) == 0) {
-                    for(Tuple r : rightPartition) { // TODO: need to just add one at a time, or outbatch will overflow
+                    for (Tuple r : rightPartition) {
                         assert leftbatch.get(lcurs).checkJoin(rightPartition.get(0), leftAttrIndex, rightAttrIndex);
                         System.out.println("Joining these tuples");
                         Debug.PPrint(leftbatch.get(lcurs));
-                        Debug.PPrint(rightbatch.get(0));
-                        outbatch.add(leftbatch.get(lcurs).joinWith(r)); 
+                        Debug.PPrint(r);
+                        outbatch.add(leftbatch.get(lcurs).joinWith(r));
                     }
                 } else {
                     // No match on LHS, clear rightPartition
@@ -486,9 +490,12 @@ public class SortMergeJoin extends Join {
                 System.out.println("Tuples match");
                 Debug.PPrint(leftbatch.get(lcurs));
                 Debug.PPrint(rightbatch.get(rcurs));
-                if (!rightPartition.isEmpty() && Tuple.compareTuples(rightbatch.get(rcurs), rightPartition.get(0), rightAttrIndex, rightAttrIndex) == 0) {
+                if ( rightPartition.isEmpty() || (!rightPartition.isEmpty() && Tuple.compareTuples(rightbatch.get(rcurs), rightPartition.get(0), rightAttrIndex, rightAttrIndex) == 0)) {
                     System.out.println("Added right tuple to rightPartition");
                     rightPartition.add(rightbatch.get(rcurs));
+                } else {
+                    System.out.println("Reset rightPartition");
+                    rightPartition.clear();
                 }
 
                 assert leftbatch.get(lcurs).checkJoin(rightbatch.get(rcurs), leftAttrIndex, rightAttrIndex);
@@ -504,17 +511,6 @@ public class SortMergeJoin extends Join {
     public boolean close() {
         File lf = new File(leftMergedRunName);
         File rf = new File(rightMergedRunName);
-
-//        System.out.println("allLeftBatches");
-//        for(Batch b : allLeftBatches) {
-//            Debug.PPrint(b);
-//        }
-//
-//        System.out.println("allRightBatches");
-//        for(Batch b : allRightBatches) {
-//            Debug.PPrint(b);
-//        }
-
 
         lf.delete();
         rf.delete();
