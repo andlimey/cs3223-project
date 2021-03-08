@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 
 import static java.lang.Math.min;
 
-public class Groupby extends Operator {
+public class Groupby  extends Operator {
 
     Operator base;
     ArrayList<Attribute> attrset;  // Set of attributes to order by
