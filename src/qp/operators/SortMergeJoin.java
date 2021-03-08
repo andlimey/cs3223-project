@@ -19,6 +19,9 @@ public class SortMergeJoin extends Join {
     Batch rightbatch;               // Buffer page for right input stream
     ObjectInputStream in;           // File pointer to the right hand materialized file
 
+    ArrayList<Batch> allLeftBatches = new ArrayList<>();
+    ArrayList<Batch> allRightBatches = new ArrayList<>();
+
     int leftBatchSize;
     int rightBatchSize;
 
@@ -27,9 +30,12 @@ public class SortMergeJoin extends Join {
 
     int lcurs;                      // Cursor for left side buffer
     int rcurs;                      // Cursor for right side buffer
-    int prevrcurs;                      // Previous cursor for right side buffer
     boolean eosl;                   // Whether end of stream (left table) is reached
     boolean eosr;                   // Whether end of stream (right table) is reached
+
+    ArrayList<Tuple> rightPartition = new ArrayList<>();
+    ObjectInputStream leftIn = null;
+    ObjectInputStream rightIn = null;   
 
     public SortMergeJoin(Join jn) {
         super(jn.getLeft(), jn.getRight(), jn.getConditionList(), jn.getOpType());
@@ -132,7 +138,6 @@ public class SortMergeJoin extends Join {
 
         lcurs = 0;
         rcurs = 0;
-        prevrcurs = 0;
         eosl = false;
         eosr = false;
 
@@ -149,6 +154,15 @@ public class SortMergeJoin extends Join {
 
         System.out.println("leftMergedRunName: " + this.leftMergedRunName);
         System.out.println("rightMergedRunName: " + this.rightMergedRunName);
+
+
+        try {
+            leftIn = new ObjectInputStream(new FileInputStream(leftMergedRunName));
+            rightIn = new ObjectInputStream(new FileInputStream(rightMergedRunName));
+        } catch (IOException io) {
+            System.err.println("SortMergeJoin:error in reading a mergedRun file");
+            System.exit(1);
+        }
 
         return true;
     }
@@ -384,104 +398,123 @@ public class SortMergeJoin extends Join {
     }
 
 
-//    @Override
-//    public Batch next() {
-//        if (eosl || eosr) {
-//            return null;
-//        }
-//        outbatch = new Batch(batchsize);
-//        ObjectInputStream leftIn = null;
-//        ObjectInputStream rightIn = null;
-//
-//        try {
-//            leftIn = new ObjectInputStream(new FileInputStream(leftMergedRunName));
-//            rightIn = new ObjectInputStream(new FileInputStream(rightMergedRunName));
-//        } catch (IOException io) {
-//            System.err.println("SortMergeJoin:error in reading a mergedRun file");
-//            System.exit(1);
-//        }
-//
-//        while (!outbatch.isFull()) {
-//            if (eosl || eosr) return outbatch;
-//
-//            // Load r or s from their batches if empty
-//            //TODO: refactor
-//            try {
-//                if (lcurs >= leftbatch.size()) {
-//                    leftbatch = (Batch) leftIn.readObject();
-//                    lcurs = 0;
-//                }
-//            } catch (EOFException e) {
-//                try {
-//                    leftIn.close();
-//                } catch (IOException io) {
-//                    System.out.println("SortMergeJoin: Error in reading left merged run file");
-//                }
-//                eosl = true;
-//            } catch (ClassNotFoundException c) {
-//                System.out.println("SortMergeJoin: Error in deserialising left merged run file ");
-//                System.exit(1);
-//            } catch (IOException io) {
-//                System.out.println("SortMergeJoin: Error in reading left merged run file");
-//                System.exit(1);
-//            }
-//
-//            try {
-//                if (rcurs >= rightbatch.size()) {
-//                    rightbatch = (Batch) rightIn.readObject();
-//                    rcurs = 0;
-//                }
-//            } catch (EOFException e) {
-//                try {
-//                    rightIn.close();
-//                } catch (IOException io) {
-//                    System.out.println("SortMergeJoin: Error in reading right merged run file");
-//                }
-//                eosr = true;
-//            } catch (ClassNotFoundException c) {
-//                System.out.println("SortMergeJoin: Error in deserialising right merged run file ");
-//                System.exit(1);
-//            } catch (IOException io) {
-//                System.out.println("SortMergeJoin: Error in reading right merged run file");
-//                System.exit(1);
-//            }
-//
-//            while (lcurs < leftbatch.size() && rcurs < rightbatch.size()) {
-//                while (lcurs < leftbatch.size() && Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftindex, rightindex) == -1) {
-//                    lcurs++;
-//                }
-//                if (lcurs >= leftbatch.size()) break;
-//
-//                while (rcurs < rightbatch.size() && Tuple.compareTuples(rightbatch.get(rcurs), leftbatch.get(lcurs), rightindex, leftindex) == -1) {
-//                    rcurs++;
-//                }
-//                if (rcurs >= rightbatch.size()) break;
-//
-//
-//                if (Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftindex, rightindex) == 0) {
-//                    System.out.println("Tuples are equal");
-//                    Debug.PPrint(leftbatch.get(lcurs));
-//                    Debug.PPrint(rightbatch.get(rcurs));
-//                    prevrcurs = rcurs;
-//                    while(rcurs < rightbatch.size() && Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftindex, rightindex) == 0) {
-//                        assert leftbatch.get(lcurs).checkJoin(rightbatch.get(rcurs), leftindex, rightindex);
-//                        Tuple outtuple = leftbatch.get(lcurs).joinWith(rightbatch.get(rcurs));
-//                        outbatch.add(outtuple);
-//                        rcurs++;
-//                        continue;
-//                    }
-//                    rcurs = prevrcurs;
-//                    lcurs++;
-//                }
-//            }
-//        }
-//        return outbatch;
-//    }
+    @Override
+    public Batch next() {
+        if (eosl || eosr) {
+            return null;
+        }
+        outbatch = new Batch(batchsize);
+
+        while (!outbatch.isFull()) {
+            if (eosl || eosr) return outbatch;
+
+            // Load r or s from their batches if empty
+            try {
+                if (lcurs >= leftbatch.size()) {
+                    leftbatch = (Batch) leftIn.readObject();
+                    lcurs = 0;
+                }
+            } catch (EOFException e) {
+                try {
+                    leftIn.close();
+                } catch (IOException io) {
+                    System.out.println("SortMergeJoin: Error in reading left merged run file");
+                }
+                eosl = true;
+                return outbatch;
+            } catch (ClassNotFoundException c) {
+                System.out.println("SortMergeJoin: Error in deserialising left merged run file ");
+                System.exit(1);
+            } catch (IOException io) {
+                System.out.println("SortMergeJoin: Error in reading left merged run file");
+                System.exit(1);
+            }
+
+            try {
+                if (rcurs >= rightbatch.size()) {
+                    rightbatch = (Batch) rightIn.readObject();
+                    rcurs = 0;
+                }
+            } catch (EOFException e) {
+                try {
+                    rightIn.close();
+                } catch (IOException io) {
+                    System.out.println("SortMergeJoin: Error in reading right merged run file");
+                }
+                eosr = true;
+                return outbatch;
+            } catch (ClassNotFoundException c) {
+                System.out.println("SortMergeJoin: Error in deserialising right merged run file ");
+                System.exit(1);
+            } catch (IOException io) {
+                System.out.println("SortMergeJoin: Error in reading right merged run file");
+                System.exit(1);
+            }
+
+            while (lcurs < leftbatch.size() && Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftindex, rightindex) == -1) {
+                System.out.println("here2");
+                lcurs++;
+                if (lcurs >= leftbatch.size()) break;
+                if (!rightPartition.isEmpty() && Tuple.compareTuples(leftbatch.get(lcurs), rightPartition.get(0), leftindex, rightindex) == 0) {
+                    for(Tuple r : rightPartition) { // TODO: need to just add one at a time, or outbatch will overflow
+                        assert leftbatch.get(lcurs).checkJoin(rightPartition.get(0), leftindex, rightindex);
+                        System.out.println("Joining these tuples");
+                        Debug.PPrint(leftbatch.get(lcurs));
+                        Debug.PPrint(rightbatch.get(0));
+                        outbatch.add(leftbatch.get(lcurs).joinWith(r)); 
+                    }
+                } else {
+                    // No match on LHS, clear rightPartition
+                    System.out.println("No match for LHS and rightPartition[0]");
+                    Debug.PPrint(leftbatch.get(lcurs));
+                    Debug.PPrint(rightbatch.get(0));
+                    System.out.println("Clearing rightPartition");
+                    rightPartition.clear();
+                }
+            }
+            if (lcurs >= leftbatch.size()) continue;
+
+            while (rcurs < rightbatch.size() && Tuple.compareTuples(rightbatch.get(rcurs), leftbatch.get(lcurs), rightindex, leftindex) == -1) {
+                System.out.println("rcurs: " + rcurs);
+                System.out.println("rightbatch.size(): " + rightbatch.size());
+                System.out.println("here3");
+                rcurs++;
+            }
+            if (rcurs >= rightbatch.size()) continue;
+
+            if (Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftindex, rightindex) == 0) {
+                System.out.println("Tuples match");
+                Debug.PPrint(leftbatch.get(lcurs));
+                Debug.PPrint(rightbatch.get(rcurs));
+                if (!rightPartition.isEmpty() && Tuple.compareTuples(rightbatch.get(rcurs), rightPartition.get(0), rightindex, rightindex) == 0) {
+                    System.out.println("Added right tuple to rightPartition");
+                    rightPartition.add(rightbatch.get(rcurs));
+                }
+
+                assert leftbatch.get(lcurs).checkJoin(rightbatch.get(rcurs), leftindex, rightindex);
+                Tuple outtuple = leftbatch.get(lcurs).joinWith(rightbatch.get(rcurs));
+                outbatch.add(outtuple); 
+                rcurs++;
+            }
+        }
+        return outbatch;
+    }
 
     @Override
     public boolean close() {
         File lf = new File(leftMergedRunName);
         File rf = new File(rightMergedRunName);
+
+//        System.out.println("allLeftBatches");
+//        for(Batch b : allLeftBatches) {
+//            Debug.PPrint(b);
+//        }
+//
+//        System.out.println("allRightBatches");
+//        for(Batch b : allRightBatches) {
+//            Debug.PPrint(b);
+//        }
+
 
         lf.delete();
         rf.delete();
