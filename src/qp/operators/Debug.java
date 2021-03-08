@@ -172,7 +172,6 @@ public class Debug {
         System.out.println();
     }
 
-
     /**
      * print a page of tuples
      **/
@@ -182,7 +181,6 @@ public class Debug {
             System.out.println();
         }
     }
-
 }
 
 
