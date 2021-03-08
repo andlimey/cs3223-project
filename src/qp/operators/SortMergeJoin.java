@@ -11,8 +11,8 @@ import static java.lang.Math.min;
 public class SortMergeJoin extends Join {
     static int filenum = 0;         // To get unique filenum for this operation
     int batchsize;                  // Number of tuples per out batch
-    ArrayList<Integer> leftindex;   // Indices of the join attributes in left table
-    ArrayList<Integer> rightindex;  // Indices of the join attributes in right table
+    int[] leftAttrIndex;   // Indices of the join attributes in left table
+    int[] rightAttrIndex;  // Indices of the join attributes in right table
     String rfname;                  // The file name where the right table is materialized
     Batch outbatch;                 // Buffer page for output
     Batch leftbatch;                // Buffer page for left input stream
@@ -54,11 +54,11 @@ public class SortMergeJoin extends Join {
      * each file is stored as a temporary file and named according to their run and pass number.
      *
      * @param base is the operator whose input will be used in generating the runs.
-     * @param id contains the indices of attributes on which the tuples will be sorted on.
+     * @param attindex contains the indices of attributes on which the tuples will be sorted on.
      * @param basename is the leading portion of each run's filename.
      * @return the filenames of the generated sorted runs.
      */
-    public ArrayList<String> generateSortedRuns(Operator base, ArrayList<Integer> id, String basename, int bsize) {
+    public ArrayList<String> generateSortedRuns(Operator base, int[] attindex, String basename, int bsize) {
         int runnum = 0;
         Batch inbatch = base.next();
         int runCapacity = numBuff*inbatch.capacity(); // Max number of tuples in a sorted run
@@ -67,7 +67,7 @@ public class SortMergeJoin extends Join {
         while (inbatch != null) {
             // Buffers are full, sort the pages in a single run and write out
              if (runToBeStored.size() == runCapacity) {
-                 Collections.sort(runToBeStored, new TupleComparator(id));
+                 Collections.sort(runToBeStored, new TupleComparator(attindex));
                  String rfname = generateRunFileName(basename, 0, runnum);
                  WriteRunToFile(runToBeStored, runNames, rfname, inbatch.capacity());
 
@@ -81,7 +81,7 @@ public class SortMergeJoin extends Join {
 
         // Store leftover tuples from inbatch
         if (runToBeStored.size() != 0) {
-            Collections.sort(runToBeStored, new TupleComparator(id));
+            Collections.sort(runToBeStored, new TupleComparator(attindex));
             String rfname = generateRunFileName(basename, 0, runnum);
             WriteRunToFile(runToBeStored, runNames, rfname, bsize);
         }
@@ -127,13 +127,13 @@ public class SortMergeJoin extends Join {
         batchsize = Batch.getPageSize() / tuplesize;
 
         /** find indices attributes of join conditions **/
-        leftindex = new ArrayList<>();
-        rightindex = new ArrayList<>();
-        for (Condition con : conditionList) {
-            Attribute leftattr = con.getLhs();
-            Attribute rightattr = (Attribute) con.getRhs();
-            leftindex.add(left.getSchema().indexOf(leftattr));
-            rightindex.add(right.getSchema().indexOf(rightattr));
+        leftAttrIndex = new int[conditionList.size()];
+        rightAttrIndex = new int[conditionList.size()];
+        for (int i = 0; i < conditionList.size(); i++) {
+            Attribute leftattr = conditionList.get(i).getLhs();
+            Attribute rightattr = (Attribute) conditionList.get(i).getRhs();
+            leftAttrIndex[i] = left.getSchema().indexOf(leftattr);
+            rightAttrIndex[i] = right.getSchema().indexOf(rightattr);
         }
 
         lcurs = 0;
@@ -144,13 +144,13 @@ public class SortMergeJoin extends Join {
         if (!left.open() || !right.open()) return false;
 
         // External Sort
-        ArrayList<String> leftSortedRunNames = generateSortedRuns(left, leftindex,"temp-left", leftBatchSize);
+        ArrayList<String> leftSortedRunNames = generateSortedRuns(left, leftAttrIndex,"temp-left", leftBatchSize);
         System.out.println("leftSortedRunNames: " + leftSortedRunNames);
-        this.leftMergedRunName = mergeSortedRuns(leftSortedRunNames, "temp-left", 1, leftBatchSize, leftindex).get(0);
+        this.leftMergedRunName = mergeSortedRuns(leftSortedRunNames, "temp-left", 1, leftBatchSize, leftAttrIndex).get(0);
 
-        ArrayList<String> rightSortedRunNames = generateSortedRuns(right, rightindex,"temp-right", rightBatchSize);
+        ArrayList<String> rightSortedRunNames = generateSortedRuns(right, rightAttrIndex,"temp-right", rightBatchSize);
         System.out.println("rightSortedRunNames: " + rightSortedRunNames);
-        this.rightMergedRunName = mergeSortedRuns(rightSortedRunNames, "temp-right", 1, rightBatchSize, rightindex).get(0);
+        this.rightMergedRunName = mergeSortedRuns(rightSortedRunNames, "temp-right", 1, rightBatchSize, rightAttrIndex).get(0);
 
         System.out.println("leftMergedRunName: " + this.leftMergedRunName);
         System.out.println("rightMergedRunName: " + this.rightMergedRunName);
@@ -167,7 +167,7 @@ public class SortMergeJoin extends Join {
         return true;
     }
 
-    private ArrayList<String> mergeSortedRuns(ArrayList<String> runFileNames, String basename, int passnum, int bsize, ArrayList<Integer> id) {
+    private ArrayList<String> mergeSortedRuns(ArrayList<String> runFileNames, String basename, int passnum, int bsize, int[] attrIndex) {
         if (runFileNames.size() == 1) return runFileNames; // merge to a single run
         ArrayList<String> mergedRuns = new ArrayList<>();
         String rfname;
@@ -176,7 +176,7 @@ public class SortMergeJoin extends Join {
         // Merge runs in batches of numBuff-1
         for (int i = 0, j = min(numBuff-1, runFileNames.size()); i < j; i = j, j = min(j+numBuff-1, runFileNames.size())) {
             rfname = generateRunFileName(basename, passnum, mergedRuns.size());
-            merge(new ArrayList<>(runFileNames.subList(i, j)), rfname, bsize, id);
+            merge(new ArrayList<>(runFileNames.subList(i, j)), rfname, bsize, attrIndex);
             System.out.println("Writing runfile: " + rfname);
             Debug.PPrint(rfname);
             mergedRuns.add(rfname);
@@ -187,10 +187,10 @@ public class SortMergeJoin extends Join {
             File f = new File(fname);
             f.delete();
         }
-        return mergeSortedRuns(mergedRuns, basename, passnum+1, bsize, id);
+        return mergeSortedRuns(mergedRuns, basename, passnum+1, bsize, attrIndex);
     }
 
-    private void merge(ArrayList<String> runNames, String mergedRunFileName, int bsize, ArrayList<Integer> id) {
+    private void merge(ArrayList<String> runNames, String mergedRunFileName, int bsize, int[] attrIndex) {
         // TODO: if runNames.size() < numBuff-1, then all numBuffs should be used
         System.out.println("====== merge(): " + mergedRunFileName + "======");
         System.out.println("Merging runs: " + runNames);
@@ -362,7 +362,7 @@ public class SortMergeJoin extends Join {
                     System.out.println("batchMin: ");
                     Debug.PPrint(batchMin);
 
-                    if (Tuple.compareTuples(minSoFar, batchMin, id, id) == 1) { // minSoFar > batchMin
+                    if (Tuple.compareTuples(minSoFar, batchMin, attrIndex, attrIndex) == 1) { // minSoFar > batchMin
                         minSoFar = batchMin;
                         chosen = buffers[i];
                     }
@@ -451,13 +451,13 @@ public class SortMergeJoin extends Join {
                 System.exit(1);
             }
 
-            while (lcurs < leftbatch.size() && Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftindex, rightindex) == -1) {
+            while (lcurs < leftbatch.size() && Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftAttrIndex, rightAttrIndex) == -1) {
                 System.out.println("here2");
                 lcurs++;
                 if (lcurs >= leftbatch.size()) break;
-                if (!rightPartition.isEmpty() && Tuple.compareTuples(leftbatch.get(lcurs), rightPartition.get(0), leftindex, rightindex) == 0) {
+                if (!rightPartition.isEmpty() && Tuple.compareTuples(leftbatch.get(lcurs), rightPartition.get(0), leftAttrIndex, rightAttrIndex) == 0) {
                     for(Tuple r : rightPartition) { // TODO: need to just add one at a time, or outbatch will overflow
-                        assert leftbatch.get(lcurs).checkJoin(rightPartition.get(0), leftindex, rightindex);
+                        assert leftbatch.get(lcurs).checkJoin(rightPartition.get(0), leftAttrIndex, rightAttrIndex);
                         System.out.println("Joining these tuples");
                         Debug.PPrint(leftbatch.get(lcurs));
                         Debug.PPrint(rightbatch.get(0));
@@ -474,7 +474,7 @@ public class SortMergeJoin extends Join {
             }
             if (lcurs >= leftbatch.size()) continue;
 
-            while (rcurs < rightbatch.size() && Tuple.compareTuples(rightbatch.get(rcurs), leftbatch.get(lcurs), rightindex, leftindex) == -1) {
+            while (rcurs < rightbatch.size() && Tuple.compareTuples(rightbatch.get(rcurs), leftbatch.get(lcurs), rightAttrIndex, leftAttrIndex) == -1) {
                 System.out.println("rcurs: " + rcurs);
                 System.out.println("rightbatch.size(): " + rightbatch.size());
                 System.out.println("here3");
@@ -482,16 +482,16 @@ public class SortMergeJoin extends Join {
             }
             if (rcurs >= rightbatch.size()) continue;
 
-            if (Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftindex, rightindex) == 0) {
+            if (Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftAttrIndex, rightAttrIndex) == 0) {
                 System.out.println("Tuples match");
                 Debug.PPrint(leftbatch.get(lcurs));
                 Debug.PPrint(rightbatch.get(rcurs));
-                if (!rightPartition.isEmpty() && Tuple.compareTuples(rightbatch.get(rcurs), rightPartition.get(0), rightindex, rightindex) == 0) {
+                if (!rightPartition.isEmpty() && Tuple.compareTuples(rightbatch.get(rcurs), rightPartition.get(0), rightAttrIndex, rightAttrIndex) == 0) {
                     System.out.println("Added right tuple to rightPartition");
                     rightPartition.add(rightbatch.get(rcurs));
                 }
 
-                assert leftbatch.get(lcurs).checkJoin(rightbatch.get(rcurs), leftindex, rightindex);
+                assert leftbatch.get(lcurs).checkJoin(rightbatch.get(rcurs), leftAttrIndex, rightAttrIndex);
                 Tuple outtuple = leftbatch.get(lcurs).joinWith(rightbatch.get(rcurs));
                 outbatch.add(outtuple); 
                 rcurs++;

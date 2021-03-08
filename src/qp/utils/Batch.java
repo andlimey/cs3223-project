@@ -38,14 +38,6 @@ public class Batch implements Serializable {
         tuples = new ArrayList<>(MAX_SIZE);
     }
 
-    public Batch copyOf(Batch b) {
-        Batch copy = new Batch(b.MAX_SIZE);
-        for (Tuple t : b.tuples) {
-            copy.add(t);
-        }
-        return copy;
-    }
-
     /** Insert the record in page at next free location **/
     public void add(Tuple t) {
         tuples.add(t);
@@ -98,9 +90,5 @@ public class Batch implements Serializable {
             return true;
         else
             return false;
-    }
-
-    public ArrayList<Tuple> getAllTuplesCopy() {
-        return new ArrayList<>(tuples);
     }
 }

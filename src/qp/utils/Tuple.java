@@ -6,6 +6,7 @@ package qp.utils;
 
 import java.util.*;
 import java.io.*;
+import java.util.stream.Collectors;
 
 /**
  * Tuple - a simple object which holds an ArrayList of data
@@ -56,6 +57,13 @@ public class Tuple implements Serializable {
             }
         }
         return true;
+    }
+
+    // checkJoin using int[]
+    public boolean checkJoin(Tuple right, int[] leftindex, int[] rightindex) {
+        ArrayList<Integer> l = new ArrayList<>(Arrays.stream(leftindex).boxed().collect(Collectors.toList()));
+        ArrayList<Integer> r = new ArrayList<>(Arrays.stream(rightindex).boxed().collect(Collectors.toList()));
+        return checkJoin(right, l, r);
     }
 
     /**
@@ -137,5 +145,14 @@ public class Tuple implements Serializable {
             }
         }
         return 0;
+    }
+
+    /**
+     * Comparing tuples in different tables with multiple conditions, used for join condition checking
+     **/
+    public static int compareTuples(Tuple left, Tuple right, int[] leftIndex, int[] rightIndex) {
+        ArrayList<Integer> l = new ArrayList<>(Arrays.stream(leftIndex).boxed().collect(Collectors.toList()));
+        ArrayList<Integer> r = new ArrayList<>(Arrays.stream(rightIndex).boxed().collect(Collectors.toList()));
+        return compareTuples(left, right, l, r);
     }
 }
