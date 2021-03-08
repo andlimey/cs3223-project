@@ -37,7 +37,7 @@ public class BlockNestedJoin extends Join {
     int bcurs;                      // Cursor for block
     boolean eosl;                   // Whether end of stream (left table) is reached
     boolean eosr;                   // Whether end of stream (right table) is reached
-    boolean eobj;                   // Whether end of block object
+    boolean eobo;                   // Whether end of block object
 
     public BlockNestedJoin(Join jn) {
         super(jn.getLeft(), jn.getRight(), jn.getConditionList(), jn.getOpType());
@@ -75,7 +75,7 @@ public class BlockNestedJoin extends Join {
         lcurs = 0;
         rcurs = 0;
         bcurs = 0;
-        eobj = false;
+        eobo = false;
         eosl = false;
         /** because right stream is to be repetitively scanned
          ** if it reached end, we have to start new scan
@@ -94,8 +94,6 @@ public class BlockNestedJoin extends Join {
              **/
             filenum++;
             rfname = "BNJtemp-" + String.valueOf(filenum);
-            System.out.println(rfname);
-            System.out.println("OPTYPE " + right.getOpType());
             try {
                 ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(rfname));
                 while ((rightpage = right.next()) != null) {
@@ -120,62 +118,42 @@ public class BlockNestedJoin extends Join {
      * * And returns a page of output tuples
      **/
     public Batch next() {
-        System.out.println("bump next 1");
-
         int i, j, k;
-        if (eobj) {
+        if (eobo) {
             close();
             return null;
         }
         outbatch = new Batch(batchsize);   
-        while (!outbatch.isFull() && eobj == false) {
-            System.out.println("bump next 1.2");
-
+        while (!outbatch.isFull() && eobo == false) {
             if (lcurs == 0 && eosr == true && bcurs == 0) {
                 /** new left block is to be fetched**/
                 outerBlock = new ArrayList<>(outerBlockSize);
                 while(outerBlock.size() < outerBlockSize) {
-                    System.out.println("bump next 2");
                     Batch currBatch = (Batch) left.next();
                     if (currBatch == null || currBatch.isEmpty()) {
-                        System.out.println("bump next 2.1");
                         eosl = true;
-                        System.out.println("bump next 2.4");
                         break;
                     }
-                    System.out.println("bump next 2.5");
                     outerBlock.add(currBatch);
                 }
 
                 /** Whenever a new left block come, we have to start the
                  ** scanning of right table
                  **/
-                
-
                 try {
-                    System.out.println("bump next 2.2");
                     in = new ObjectInputStream(new FileInputStream(rfname));
                     eosr = false;
-                    System.out.println(eosr);
                 } catch (IOException io) {
                     System.err.println("BlockNestedJoin:error in reading the file");
                     System.exit(1);
                 }
             }
             while (eosr == false) {
-                System.out.println("bump next 1.3");
-
                 try {
-                    System.out.println(bcurs + " " + lcurs + " " + rcurs);
                     if (rcurs == 0 && lcurs == 0 && bcurs == 0) {
                         rightbatch = (Batch) in.readObject();
-                        System.out.println("Reading right batch");
                     }
-                    System.out.println("outerblock= " + outerBlock.size());
-                    // if (outerBlock.size() == 0) System.exit(1);
                     for(k = bcurs; k < outerBlock.size(); ++k ) {
-                        System.out.println("outerblock= " + outerBlock.size());
-                        System.out.println(k);
                         Batch leftbatch = outerBlock.get(k);
                         for (i = lcurs; i < leftbatch.size(); ++i) {
                             for (j = rcurs; j < rightbatch.size(); ++j) {
@@ -183,7 +161,6 @@ public class BlockNestedJoin extends Join {
                                 Tuple righttuple = rightbatch.get(j);
                                 if (lefttuple.checkJoin(righttuple, leftindex, rightindex)) {
                                     Tuple outtuple = lefttuple.joinWith(righttuple);
-                                    Debug.PPrint(outtuple);
                                     outbatch.add(outtuple);
                                     if (outbatch.isFull()) {
                                         if (i == leftbatch.size() - 1 && 
@@ -218,14 +195,14 @@ public class BlockNestedJoin extends Join {
                     }
                     bcurs = 0;
                 } catch (EOFException e) {
-                    System.out.println("EOF!!!!!!!!!!!!!");
                     try {
                         in.close();
                     } catch (IOException io) {
                         System.out.println("BlockNestedJoin: Error in reading temporary file");
                     }
+                    // if left stream is done reading, can end block object
                     if(eosl) {
-                        eobj = true;
+                        eobo = true;
                     }
                     eosr = true;
                 } catch (ClassNotFoundException c) {
@@ -244,8 +221,6 @@ public class BlockNestedJoin extends Join {
      * Close the operator
      */
     public boolean close() {
-        System.out.println("bump close");
-
         File f = new File(rfname);
         f.delete();
         return true;
