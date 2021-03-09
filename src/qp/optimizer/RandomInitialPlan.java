@@ -4,6 +4,7 @@
 
 package qp.optimizer;
 
+import org.w3c.dom.Attr;
 import qp.operators.*;
 import qp.utils.*;
 
@@ -213,7 +214,14 @@ public class RandomInitialPlan {
     public void createOrderbyOp() {
         Operator base = root;
         if (!orderbylist.isEmpty()) {
-            root = new Orderby(base, orderbylist, OpType.ORDERBY, isDesc);
+            if (!groupbylist.isEmpty()) {
+                // Combines groupby list and orderby list to maintain the groups when sorting.
+                ArrayList<Attribute> combinedList = new ArrayList<>(groupbylist);
+                combinedList.addAll(orderbylist);
+                root = new Orderby(base, combinedList, OpType.ORDERBY, isDesc);
+            } else {
+                root = new Orderby(base, orderbylist, OpType.ORDERBY, isDesc);
+            }
             root.setSchema(base.getSchema());
         }
     }
