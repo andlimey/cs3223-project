@@ -217,7 +217,14 @@ public class RandomInitialPlan {
             if (!groupbylist.isEmpty()) {
                 // Combines groupby list and orderby list to maintain the groups when sorting.
                 ArrayList<Attribute> combinedList = new ArrayList<>(groupbylist);
-                combinedList.addAll(orderbylist);
+
+                // Doesn't include duplicated attributes in the combined list.
+                for (Attribute attr: orderbylist) {
+                    if (!combinedList.contains(attr)) {
+                        combinedList.add(attr);
+                    }
+                }
+                System.out.println(combinedList);
                 root = new Orderby(base, combinedList, OpType.ORDERBY, isDesc);
             } else {
                 root = new Orderby(base, orderbylist, OpType.ORDERBY, isDesc);
