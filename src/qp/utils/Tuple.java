@@ -4,9 +4,6 @@
 
 package qp.utils;
 
-import java_cup.runtime.Symbol;
-import qp.operators.Debug;
-
 import java.util.*;
 import java.io.*;
 
@@ -14,8 +11,6 @@ import java.io.*;
  * Tuple - a simple object which holds an ArrayList of data
  */
 public class Tuple implements Serializable {
-    private static final long serialVersionUID = 6529685098267757690L;
-
     public ArrayList<Object> _data;
 
     public Tuple(ArrayList<Object> d) {
@@ -131,34 +126,5 @@ public class Tuple implements Serializable {
             }
         }
         return 0;
-    }
-
-    @Override
-    public int hashCode() {
-        // IntelliJ's suggested hashCode function.
-        int result = (int) (_data.hashCode() ^ (_data.hashCode() >>> 32));
-        for (Object obj : _data) {
-            if (obj instanceof Integer) {
-                result += 31 * result + ((Integer) obj).hashCode();
-            } else if (obj instanceof String) {
-                result += 31 * result + ((String) obj).hashCode();
-            } else if (obj instanceof Float) {
-                result += 31 * result + ((Float) obj).hashCode();
-            } else {
-                System.out.println("Tuple: hashCode() unsupported for unknown data type");
-                System.exit(1);
-                return 0;
-            }
-        }
-//        System.out.println("Hashcode: "  + result);
-        return result;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null) return false;
-        if (!(o instanceof Tuple)) return false;
-        return o.hashCode() == this.hashCode();
     }
 }
