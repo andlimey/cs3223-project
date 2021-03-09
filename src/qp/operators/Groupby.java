@@ -15,7 +15,7 @@ import static java.lang.Math.min;
 public class Groupby  extends Operator {
 
     Operator base;
-    ArrayList<Attribute> attrset;  // Set of attributes to order by
+    ArrayList<Attribute> attrset;  // Set of attributes to group by
     int batchsize;                 // Number of tuples per outbatch
     int numBuffer = 3;             // Number of buffers used for sorting. Minimally need 3.
     int numRuns = 0;
@@ -28,14 +28,14 @@ public class Groupby  extends Operator {
 
     /**
      * The following fields are requied during execution
-     * * of the Orderby Operator
+     * * of the Groupby Operator
      **/
     Batch inbatch;
     Batch outbatch;
 
     /**
      * index of the attributes in the base operator
-     * * that are to be ordered by
+     * * that are to be grouped by
      **/
     int[] attrIndex;
 
@@ -62,7 +62,7 @@ public class Groupby  extends Operator {
     /**
      * Opens the connection to the base operator
      * * Also figures out what are the columns to be
-     * * ordered by from the base operator
+     * * grouped by from the base operator
      **/
     public boolean open() {
         /** set number of tuples per batch **/
@@ -73,7 +73,7 @@ public class Groupby  extends Operator {
         System.out.println("Batch size is: " + batchsize);
 
         if (!base.open()) return false;
-        StoreIndexToOrderBy();
+        StoreIndexToGroupBy();
         GenerateSortedRuns();
         MergeSortedRuns();
         PrepareLastRun();
@@ -81,9 +81,9 @@ public class Groupby  extends Operator {
     }
 
     /**
-     * Stores the indices of the attributes to order by.
+     * Stores the indices of the attributes to group by.
      */
-    private void StoreIndexToOrderBy() {
+    private void StoreIndexToGroupBy() {
         Schema baseSchema = base.getSchema();
         attrIndex = new int[attrset.size()];
         for (int i = 0; i < attrset.size(); ++i) {
@@ -153,7 +153,7 @@ public class Groupby  extends Operator {
     }
 
     private String GenerateFileName(int passNum, int runNum) {
-        return String.format("Orderby_Pass-%d_Run-%d", passNum, runNum);
+        return String.format("Groupby_Pass-%d_Run-%d", passNum, runNum);
     }
 
     /**
