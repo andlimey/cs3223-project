@@ -33,8 +33,11 @@ public class Distinct extends Operator{
     boolean[] endOfStream;
 
     int[] attrIndex;
+    ArrayList<Integer> attrIndexList;
 
-    TupleWriter writer; // only use writer for next(); current implementation uses primitive readers
+    // These are used in next() for ease 
+    TupleReader reader;
+    Tuple unique;
 
     public Distinct(Operator base, int type) {
         super(type);
@@ -54,7 +57,6 @@ public class Distinct extends Operator{
     }
 
     public void setNumBuffer(int numBuffer) {
-        System.out.println("HERE: " + numBuffer);
         this.numBuffer = numBuffer;
     }
 
@@ -71,8 +73,9 @@ public class Distinct extends Operator{
         GenerateSortedRuns();
         MergeSortedRuns(); // merge all into 1
 
-        System.out.println(runNames);
-        Debug.PPrint(runNames.get(0));
+        reader = new TupleReader(runNames.get(0), batchsize);
+        reader.open();
+
         return true;
     }
 
@@ -87,6 +90,7 @@ public class Distinct extends Operator{
         for (int i = 0; i < attrList.size(); ++i) {
             attrIndex[i] = i;
         }
+        this.attrIndexList = new ArrayList<>(Arrays.stream(attrIndex).boxed().collect(Collectors.toList()));
     }
 
     /**
@@ -163,9 +167,6 @@ public class Distinct extends Operator{
         ArrayList<String> mergedRuns = new ArrayList<>();
         // Execute the number of passes to combine to a single run
         int passCounter = (int) Math.ceil(Math.log(numRuns) / Math.log(numBuffersForMerge));
-        System.out.println("numRuns: " + numRuns);
-        System.out.println("numBuffersForMerge: " + numBuffersForMerge);
-        System.out.println("passCounter: " + passCounter);
         for (int i = 0; i < passCounter; i++) {
             numRuns = 0;    // Reset to 0 for the next pass.
             passNum++;
@@ -415,28 +416,38 @@ public class Distinct extends Operator{
         return true;
     }
 
+    @Override
+    public Batch next() {
+        if (reader.isEOF()) {
+            reader.close();
+            return null;
+        }
 
-    // @Override
-    // public Batch next() {
-    //     int i;
-    //     if (eos) {
-    //         close();
-    //         return null;
-    //     }
+        /** An output buffer is initiated **/
+        outbatch = new Batch(batchsize);
 
-    //     /** An output buffer is initiated **/
-    //     outbatch = new Batch(batchsize);
+        Tuple nextTuple;
+        if (unique == null) unique = reader.next(); 
+        while (!outbatch.isFull()) {
+            if (reader.isEOF()) {
+                outbatch.add(unique);
+                // System.out.println("Reader EOF reached. Return current outbatch.");
+                // Debug.PPrint(outbatch);
+                return outbatch;
+            }
+            nextTuple = reader.next();
+            // only add unique to outbatch once continguous duplicates have been iterated past
+            if (Tuple.compareTuples(unique, nextTuple, attrIndexList) != 0) {
+                outbatch.add(unique);
+                unique = nextTuple;
+            }
+            // when unique == nextTuple, ignore the duplicates  
+        }
 
-    //     /** keep on checking the incoming pages until
-    //      ** the output buffer is full
-    //      **/
-    //     while (!outbatch.isFull()) {
-
-    //     }
-    //     System.out.println("Outbatch is full.");
-    //     Debug.PPrint(outbatch);
-    //     return outbatch;
-    // }
+        // System.out.println("Outbatch is full.");
+        Debug.PPrint(outbatch);
+        return outbatch;
+    }
 
     @Override
     public boolean close() {
