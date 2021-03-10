@@ -12,12 +12,11 @@ import java.util.stream.Collectors;
 
 import static java.lang.Math.min;
 
-public class Orderby extends Operator {
+public class Groupby  extends Operator {
 
     Operator base;
-    ArrayList<Attribute> attrset;  // Set of attributes to order by
+    ArrayList<Attribute> attrset;  // Set of attributes to group by
     int batchsize;                 // Number of tuples per outbatch
-    boolean isDesc;
     int numBuffer = 3;             // Number of buffers used for sorting. Minimally need 3.
     int numRuns = 0;
     int passNum = 0;
@@ -29,22 +28,21 @@ public class Orderby extends Operator {
 
     /**
      * The following fields are requied during execution
-     * * of the Orderby Operator
+     * * of the Groupby Operator
      **/
     Batch inbatch;
     Batch outbatch;
 
     /**
      * index of the attributes in the base operator
-     * * that are to be ordered by
+     * * that are to be grouped by
      **/
     int[] attrIndex;
 
-    public Orderby(Operator base, ArrayList<Attribute> as, int type, boolean isDesc) {
+    public Groupby(Operator base, ArrayList<Attribute> as, int type) {
         super(type);
         this.base = base;
         this.attrset = as;
-        this.isDesc = isDesc;
     }
 
     public Operator getBase() {
@@ -55,8 +53,6 @@ public class Orderby extends Operator {
         return numBuffer;
     }
 
-    public boolean isDesc() { return isDesc; }
-
     public void setBase(Operator base) {
         this.base = base;
     }
@@ -66,7 +62,7 @@ public class Orderby extends Operator {
     /**
      * Opens the connection to the base operator
      * * Also figures out what are the columns to be
-     * * ordered by from the base operator
+     * * grouped by from the base operator
      **/
     public boolean open() {
         /** set number of tuples per batch **/
@@ -77,7 +73,7 @@ public class Orderby extends Operator {
         System.out.println("Batch size is: " + batchsize);
 
         if (!base.open()) return false;
-        StoreIndexToOrderBy();
+        StoreIndexToGroupBy();
         GenerateSortedRuns();
         MergeSortedRuns();
         PrepareLastRun();
@@ -85,9 +81,9 @@ public class Orderby extends Operator {
     }
 
     /**
-     * Stores the indices of the attributes to order by.
+     * Stores the indices of the attributes to group by.
      */
-    private void StoreIndexToOrderBy() {
+    private void StoreIndexToGroupBy() {
         Schema baseSchema = base.getSchema();
         attrIndex = new int[attrset.size()];
         for (int i = 0; i < attrset.size(); ++i) {
@@ -135,11 +131,7 @@ public class Orderby extends Operator {
     }
 
     private void SortTuplesInMemory(ArrayList<Tuple> mainMemory) {
-        if (this.isDesc()) {
-            Collections.sort(mainMemory, new TupleComparator(attrIndex).reversed());
-        } else {
-            Collections.sort(mainMemory, new TupleComparator(attrIndex));
-        }
+        Collections.sort(mainMemory, new TupleComparator(attrIndex));
     }
 
     private void WriteTuplesToFile(ArrayList<Tuple> mainMemory, int passNum, int runNum) {
@@ -161,7 +153,7 @@ public class Orderby extends Operator {
     }
 
     private String GenerateFileName(int passNum, int runNum) {
-        return String.format("Orderby_Pass-%d_Run-%d", passNum, runNum);
+        return String.format("Groupby_Pass-%d_Run-%d", passNum, runNum);
     }
 
     /**
@@ -416,14 +408,8 @@ public class Orderby extends Operator {
 
     private boolean ShouldCurrentTupleBeChosen(Tuple chosen, Tuple current) {
         ArrayList<Integer> attrToCompare = new ArrayList<>(Arrays.stream(attrIndex).boxed().collect(Collectors.toList()));
-        boolean result;
-        if (isDesc) {
-            // result = true if chosen < current
-            result = Tuple.compareTuples(chosen, current, attrToCompare) == -1;
-        } else {
-            // result = true if chosen > current
-            result = Tuple.compareTuples(chosen, current, attrToCompare) == 1;
-        }
+        // result = true if chosen > current
+        boolean result = Tuple.compareTuples(chosen, current, attrToCompare) == 1;
         return result;
     }
 
@@ -523,8 +509,8 @@ public class Orderby extends Operator {
         ArrayList<Attribute> newattr = new ArrayList<>();
         for (int i = 0; i < attrset.size(); ++i)
             newattr.add((Attribute) attrset.get(i).clone());
-        Orderby newOrderby = new Orderby(newbase, newattr, optype, this.isDesc);
-        newOrderby.setSchema(newbase.getSchema());
-        return newOrderby;
+        Groupby newGroupby = new Groupby(newbase, newattr, optype);
+        newGroupby.setSchema(newbase.getSchema());
+        return newGroupby;
     }
 }

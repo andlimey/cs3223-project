@@ -4,6 +4,7 @@
 
 package qp.optimizer;
 
+import org.w3c.dom.Attr;
 import qp.operators.*;
 import qp.utils.*;
 
@@ -57,11 +58,6 @@ public class RandomInitialPlan {
             System.exit(1);
         }
 
-        if (sqlquery.getGroupByList().size() > 0) {
-            System.err.println("GroupBy is not implemented.");
-            System.exit(1);
-        }
-
         tab_op_hash = new HashMap<>();
         createScanOp();
         createSelectOp();
@@ -69,6 +65,11 @@ public class RandomInitialPlan {
             createJoinOp();
         }
         createProjectOp();
+
+        if (sqlquery.getGroupByList().size() > 0) {
+            createGroupbyOp();
+        }
+
         if (sqlquery.getOrderByList().size() > 0) {
             createOrderbyOp();
         }
@@ -195,10 +196,39 @@ public class RandomInitialPlan {
         }
     }
 
+    public void createGroupbyOp() {
+        Operator base = root;
+        if (!groupbylist.isEmpty()) {
+            // Attribute in SELECT clause must appear in Group By clause or is a primary key.
+            for (Attribute attr : projectlist) {
+                if (!(attr.isPrimaryKey() || groupbylist.contains(attr))) {
+                    System.out.println("Attribute does not appear in Group By clause and is not a primary key.");
+                    System.exit(1);
+                }
+            }
+            root = new Groupby(base, groupbylist, OpType.GROUPBY);
+            root.setSchema(base.getSchema());
+        }
+    }
+
     public void createOrderbyOp() {
         Operator base = root;
         if (!orderbylist.isEmpty()) {
-            root = new Orderby(base, orderbylist, OpType.ORDERBY, isDesc);
+            if (!groupbylist.isEmpty()) {
+                // Combines groupby list and orderby list to maintain the groups when sorting.
+                ArrayList<Attribute> combinedList = new ArrayList<>(groupbylist);
+
+                // Doesn't include duplicated attributes in the combined list.
+                for (Attribute attr: orderbylist) {
+                    if (!combinedList.contains(attr)) {
+                        combinedList.add(attr);
+                    }
+                }
+                System.out.println(combinedList);
+                root = new Orderby(base, combinedList, OpType.ORDERBY, isDesc);
+            } else {
+                root = new Orderby(base, orderbylist, OpType.ORDERBY, isDesc);
+            }
             root.setSchema(base.getSchema());
         }
     }
