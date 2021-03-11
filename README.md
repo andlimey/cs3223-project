@@ -26,3 +26,7 @@ The conditions required to be fulfilled are:
 - Attribute is a primary key.
 
 If the above conditions are not fulfilled, RandomInitialPlan will not allow the query to pass.
+
+### Bug(s) Fixed
+Bug 1: Plancost of Nested Join is incorrect
+- The joinCost was calculated as `leftpages * rightpages` when it should be `leftpages + leftpages * rightpages`
