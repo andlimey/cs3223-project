@@ -210,7 +210,7 @@ public class PlanCost {
 
         switch (joinType) {
             case JoinType.NESTEDJOIN:
-                joincost = leftpages * rightpages;
+                joincost = leftpages + (leftpages * rightpages);
                 break;
             case JoinType.SORTMERGE:
                 long leftsortcost = 2 * leftpages * (1 + (long) (Math.ceil(Math.log(Math.ceil(leftpages / numbuff)) / Math.log(numbuff - 1))));
