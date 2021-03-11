@@ -11,7 +11,6 @@ import java.io.*;
  * Tuple - a simple object which holds an ArrayList of data
  */
 public class Tuple implements Serializable {
-
     public ArrayList<Object> _data;
 
     public Tuple(ArrayList<Object> d) {

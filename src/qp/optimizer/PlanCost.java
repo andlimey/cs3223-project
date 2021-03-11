@@ -80,6 +80,8 @@ public class PlanCost {
             return getStatistics((Orderby) node);
         } else if (node.getOpType() == OpType.GROUPBY) {
             return getStatistics((Groupby) node);
+        } else if (node.getOpType() == OpType.DISTINCT) {
+            return getStatistics((Distinct) node);
         }
         System.out.println("operator is        isFeasible = false;\n not supported");
         return 0;
@@ -99,6 +101,31 @@ public class PlanCost {
         cost += (2 * numPages * numPasses);
 
         return tuples;
+    }
+
+    protected long getStatistics(Distinct node){
+            long tuples = calculateCost(node.getBase());
+
+            long tupleSize = node.getSchema().getTupleSize();
+            long capacity = Math.max(1, Batch.getPageSize() / tupleSize);
+            long numPages = (long) Math.ceil(((double) tuples) / (double) capacity);
+            long numBuffers = node.getNumBuffer();
+
+            /**
+             * Sort phase:
+             * - Read in |R| pages, sort internally, write out |R| pages for generated sorted runs
+             * - Do external sort by merging all the runs into a single run with log(b-1)(|R|/b) passes.
+             * - note: No projection is done, as this is handled by Project operator
+             *
+             * Merge phase:
+             * - Read in |R| pages and filter out duplicates
+             **/
+            long numRuns = numPages / numBuffers;
+            long numPasses = 1 + (long) (Math.ceil(Math.log(numRuns) / Math.log(numBuffers - 1)));
+
+            cost += (2 * numPages * numPasses) + numPages;
+
+            return tuples;
     }
 
     protected long getStatistics(Orderby node) {

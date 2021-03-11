@@ -149,6 +149,11 @@ public class Debug {
 
         } else if (optype == OpType.SCAN) {
             System.out.print(((Scan) node).getTabName());
+
+        } else if (optype == OpType.DISTINCT) {
+            System.out.println("Distinct(");
+            PPrint(((Distinct) node).getBase());
+            System.out.print(")");
         }
     }
 
@@ -170,7 +175,6 @@ public class Debug {
         System.out.println();
     }
 
-
     /**
      * print a page of tuples
      **/
@@ -180,7 +184,6 @@ public class Debug {
             System.out.println();
         }
     }
-
 }
 
 

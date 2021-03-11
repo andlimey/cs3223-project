@@ -4,7 +4,6 @@
 
 package qp.optimizer;
 
-import org.w3c.dom.Attr;
 import qp.operators.*;
 import qp.utils.*;
 
@@ -25,6 +24,7 @@ public class RandomInitialPlan {
     ArrayList<Attribute> groupbylist;
     ArrayList<Attribute> orderbylist;     // List of attributes to order the results by
     boolean isDesc; // for Orderby 
+    boolean isDistinct;
     int numJoin;            // Number of joins in this query
     HashMap<String, Operator> tab_op_hash;  // Table name to the Operator
     Operator root;          // Root of the query plan tree
@@ -39,6 +39,7 @@ public class RandomInitialPlan {
         orderbylist = sqlquery.getOrderByList();
         isDesc = sqlquery.isDesc();
         numJoin = joinlist.size();
+        isDistinct = sqlquery.isDistinct();
     }
 
     /**
@@ -52,12 +53,6 @@ public class RandomInitialPlan {
      * prepare initial plan for the query
      **/
     public Operator prepareInitialPlan() {
-
-        if (sqlquery.isDistinct()) {
-            System.err.println("Distinct is not implemented.");
-            System.exit(1);
-        }
-
         tab_op_hash = new HashMap<>();
         createScanOp();
         createSelectOp();
@@ -65,16 +60,23 @@ public class RandomInitialPlan {
             createJoinOp();
         }
         createProjectOp();
-
         if (sqlquery.getGroupByList().size() > 0) {
             createGroupbyOp();
         }
-
+        createDistinctOp();
         if (sqlquery.getOrderByList().size() > 0) {
             createOrderbyOp();
         }
 
         return root;
+    }
+
+    public void createDistinctOp() {
+        Operator base = root;
+        if (isDistinct) {
+            root = new Distinct(base, OpType.DISTINCT);
+            root.setSchema(base.getSchema());
+        }
     }
 
     /**
@@ -113,7 +115,7 @@ public class RandomInitialPlan {
         // this later in CreateProjectOp
         if (selectionlist.size() == 0) {
             root = tempop;
-            return;
+            return; // seems pointless
         }
 
     }
