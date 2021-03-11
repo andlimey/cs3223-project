@@ -56,16 +56,24 @@ public class RandomInitialPlan {
         tab_op_hash = new HashMap<>();
         createScanOp();
         createSelectOp();
+        System.out.println("andychanwaiyee sux2");
+        Debug.PPrint(root);
         if (numJoin != 0) {
             createJoinOp();
+            System.out.println("andychanwaiyee sux3");
+            Debug.PPrint(root);
         }
         createProjectOp();
         if (sqlquery.getGroupByList().size() > 0) {
             createGroupbyOp();
+            System.out.println("andychanwaiyee sux4");
+            Debug.PPrint(root);
         }
         createDistinctOp();
         if (sqlquery.getOrderByList().size() > 0) {
             createOrderbyOp();
+            System.out.println("andychanwaiyee sux5");
+            Debug.PPrint(root);
         }
 
         return root;
@@ -172,8 +180,9 @@ public class RandomInitialPlan {
             jn.setSchema(newsche);
 
             /** randomly select a join type**/
-            int numJMeth = JoinType.numJoinTypes();
-            int joinMeth = RandNumb.randInt(0, numJMeth - 1);
+//            int numJMeth = JoinType.numJoinTypes();
+//            int joinMeth = RandNumb.randInt(0, numJMeth - 1);
+            int joinMeth = 0;
             jn.setJoinType(joinMeth);
             modifyHashtable(left, jn);
             modifyHashtable(right, jn);

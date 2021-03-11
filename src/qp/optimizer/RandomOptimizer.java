@@ -58,6 +58,13 @@ public class RandomOptimizer {
                     nj.setRight(right);
                     nj.setNumBuff(numbuff);
                     return nj;
+
+                case JoinType.SORTMERGE:
+                    SortMergeJoin smj = new SortMergeJoin((Join) node);
+                    smj.setLeft(left);
+                    smj.setRight(right);
+                    smj.setNumBuff(numbuff);
+                    return smj;
                 default:
                     return node;
             }
@@ -380,6 +387,12 @@ public class RandomOptimizer {
             return findNodeAt(((Select) node).getBase(), joinNum);
         } else if (node.getOpType() == OpType.PROJECT) {
             return findNodeAt(((Project) node).getBase(), joinNum);
+        } else if (node.getOpType() == OpType.ORDERBY) {
+            return findNodeAt(((Orderby) node).getBase(), joinNum);
+        } else if (node.getOpType() == OpType.DISTINCT) {
+            return findNodeAt(((Distinct) node).getBase(), joinNum);
+        } else if (node.getOpType() == OpType.GROUPBY) {
+            return findNodeAt(((Groupby) node).getBase(), joinNum);
         } else {
             return null;
         }

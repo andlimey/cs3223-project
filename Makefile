@@ -1,5 +1,7 @@
 SHELL := /bin/bash
 
+all: clean build db
+
 build:
 	source queryenv; \
 	./build.sh;
@@ -8,10 +10,10 @@ db:
 	# java RandomDB <tablename> <# of records>
 	# java ConvertTxtToTbl <tablename>
 	cp testcases/*det .; \
-	java RandomDB BILL 20; \
-	java RandomDB CART 5; \
-	java RandomDB CARTDETAILS 5; \
-	java RandomDB CUSTOMER 20; \
+	java RandomDB BILL 200; \
+	java RandomDB CART 200; \
+	java RandomDB CARTDETAILS 200; \
+	java RandomDB CUSTOMER 200; \
 	java ConvertTxtToTbl BILL; \
 	java ConvertTxtToTbl CART; \
 	java ConvertTxtToTbl CARTDETAILS; \
@@ -38,3 +40,4 @@ clean:
 	rm -fv *.txt
 	rm -fv *.out
 	rm -fv *.det
+	rm -fv temp-*

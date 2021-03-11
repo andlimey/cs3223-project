@@ -14,6 +14,14 @@ public class Batch implements Serializable {
     static int PageSize;      // Number of bytes per page
     ArrayList<Tuple> tuples;  // The tuples in the page
 
+    public Batch copyOf(Batch b) {
+        Batch copy = new Batch(b.MAX_SIZE);
+        for (Tuple t : b.tuples) {
+            copy.add(t);
+        }
+        return copy;
+    }
+
     /** Set number of bytes per page **/
     public static void setPageSize(int size) {
         PageSize = size;
@@ -28,14 +36,6 @@ public class Batch implements Serializable {
     public Batch(int numtuple) {
         MAX_SIZE = numtuple;
         tuples = new ArrayList<>(MAX_SIZE);
-    }
-
-    public Batch copyOf(Batch b) {
-        Batch copy = new Batch(b.MAX_SIZE);
-        for (Tuple t : b.tuples) {
-            copy.add(t);
-        }
-        return copy;
     }
 
     /** Insert the record in page at next free location **/
@@ -54,6 +54,8 @@ public class Batch implements Serializable {
     public boolean contains(Tuple t) {
         return tuples.contains(t);
     }
+
+    public ArrayList<Tuple> getAllTuplesCopy() { return new ArrayList<>(tuples); }
 
     public Tuple get(int i) {
         return tuples.get(i);
@@ -88,9 +90,5 @@ public class Batch implements Serializable {
             return true;
         else
             return false;
-    }
-
-    public ArrayList<Tuple> getAllTuplesCopy() {
-        return new ArrayList<>(tuples);
     }
 }
