@@ -53,15 +53,6 @@ public class RandomInitialPlan {
      * prepare initial plan for the query
      **/
     public Operator prepareInitialPlan() {
-
-        if (sqlquery.isDistinct()) {
-            System.err.println("Distinct is not implemented.");
-        }
-        if (sqlquery.getGroupByList().size() > 0) {
-            System.err.println("GroupBy is not implemented.");
-            System.exit(1);
-        }
-
         tab_op_hash = new HashMap<>();
         createScanOp();
         createSelectOp();
