@@ -69,18 +69,25 @@ public class PlanCost {
      **/
     protected long calculateCost(Operator node) {
         if (node.getOpType() == OpType.JOIN) {
+            System.out.println("1");
             return getStatistics((Join) node);
         } else if (node.getOpType() == OpType.SELECT) {
+            System.out.println("2");
             return getStatistics((Select) node);
         } else if (node.getOpType() == OpType.PROJECT) {
+            System.out.println("3");
             return getStatistics((Project) node);
         } else if (node.getOpType() == OpType.SCAN) {
+            System.out.println("4");
             return getStatistics((Scan) node);
         } else if (node.getOpType() == OpType.ORDERBY) {
+            System.out.println("5");
             return getStatistics((Orderby) node);
         } else if (node.getOpType() == OpType.GROUPBY) {
+            System.out.println("6");
             return getStatistics((Groupby) node);
         } else if (node.getOpType() == OpType.DISTINCT) {
+            System.out.println("7");
             return getStatistics((Distinct) node);
         }
         System.out.println("operator is        isFeasible = false;\n not supported");
