@@ -69,8 +69,8 @@ public class Groupby  extends Operator {
         int tuplesize = schema.getTupleSize();
         batchsize = Batch.getPageSize() / tuplesize;
 
-        System.out.println("Size of tuple is: " + tuplesize);
-        System.out.println("Batch size is: " + batchsize);
+//        System.out.println("Size of tuple is: " + tuplesize);
+//        System.out.println("Batch size is: " + batchsize);
 
         if (!base.open()) return false;
         StoreIndexToGroupBy();
@@ -103,7 +103,7 @@ public class Groupby  extends Operator {
         inbatch = base.next();
 
         while (inbatch != null) {
-            Debug.PPrint(inbatch);
+//            Debug.PPrint(inbatch);
             if (mainMemory.size() == maxTuples) {
                 SortTuplesInMemory(mainMemory);
                 WriteTuplesToFile(mainMemory, passNum, numRuns);
@@ -177,7 +177,7 @@ public class Groupby  extends Operator {
         for (int i = 0; i < runCounter; i++) {
             numRuns = 0;    // Reset to 0 for the next pass.
             passNum++;
-            System.out.println("Run names being merged are: " + runNames);
+//            System.out.println("Run names being merged are: " + runNames);
 
             // Number of runs to merge is constrained by number of buffers available
             // j and k are used to retrieve the set of runs to merge
@@ -193,7 +193,7 @@ public class Groupby  extends Operator {
             // Deletes runs already merged in current pass.
             DeleteFiles(runNames);
 
-            System.out.println("Merged Runs are: " + mergedRuns);
+//            System.out.println("Merged Runs are: " + mergedRuns);
             runNames.clear();
             runNames.addAll(mergedRuns);
             mergedRuns.clear();
@@ -201,13 +201,13 @@ public class Groupby  extends Operator {
     }
 
     private void PrepareLastRun() {
-        System.out.println("Preparing Last Merge: " + runNames);
+//        System.out.println("Preparing Last Merge: " + runNames);
         PrepareSortedRuns(runNames);
     }
 
     private void MergeKArrays(ArrayList<String> runsToMerge, String mergedFileName) {
-        System.out.println("====== merge(): " + mergedFileName + "======");
-        System.out.println("Merging runs " + runsToMerge);
+//        System.out.println("====== merge(): " + mergedFileName + "======");
+//        System.out.println("Merging runs " + runsToMerge);
 
         ObjectOutputStream outputStream = null;
         try {
@@ -227,7 +227,7 @@ public class Groupby  extends Operator {
             // Check if merging is completed
             isMergeComplete = CheckIfMergeComplete(endOfStream, buffers);
             if (isMergeComplete) {
-                System.out.println("Merge completed: " + mergedFileName + "\n");
+//                System.out.println("Merge completed: " + mergedFileName + "\n");
                 continue;
             }
 
@@ -252,8 +252,8 @@ public class Groupby  extends Operator {
                     // Input buffers are all empty and output buffer is not full. Break and write out.
                     break;
                 } else {
-                    System.out.println("Current chosen tuple is: ");
-                    Debug.PPrint(chosenTuple);
+//                    System.out.println("Current chosen tuple is: ");
+//                    Debug.PPrint(chosenTuple);
                 }
 
                 // Find minimum/maximum
@@ -270,25 +270,25 @@ public class Groupby  extends Operator {
                 }
 
                 // Add chosen to output buffer
-                System.out.print("Chosen tuple is: ");
-                Debug.PPrint(chosenTuple);
+//                System.out.print("Chosen tuple is: ");
+//                Debug.PPrint(chosenTuple);
 
                 outbatch.add(chosenTuple);
-                System.out.println("Current outbatch is: ");
-                Debug.PPrint(outbatch);
+//                System.out.println("Current outbatch is: ");
+//                Debug.PPrint(outbatch);
 
                 chosenBatch.remove(0);
             }
 
             if (outbatch.isEmpty()) {
-                System.out.println("Output buffer is empty. Don't write");
+//                System.out.println("Output buffer is empty. Don't write");
                 continue;
             }
 
             // Write out to file
             try {
-                System.out.println("Outbatch to write out is: ");
-                Debug.PPrint(outbatch);
+//                System.out.println("Outbatch to write out is: ");
+//                Debug.PPrint(outbatch);
                 outputStream.writeObject(outbatch.copyOf(outbatch));
                 outbatch.clear();
             } catch (IOException io) {
@@ -297,8 +297,8 @@ public class Groupby  extends Operator {
             }
         }
 
-        System.out.println("Printing file name");
-        Debug.PPrint(mergedFileName);
+//        System.out.println("Printing file name");
+//        Debug.PPrint(mergedFileName);
 
         try {
             outputStream.close();
@@ -331,11 +331,11 @@ public class Groupby  extends Operator {
     }
 
     private void ReadTuplesIntoBuffer(ArrayList<ObjectInputStream> runs, Batch[] buffers, boolean[] eos) {
-        System.out.println("==========Before==========");
-        for (int i = 0; i < buffers.length; i++) {
-            System.out.println("Buffer " + i + ":");
-            Debug.PPrint(buffers[i]);
-        }
+//        System.out.println("==========Before==========");
+//        for (int i = 0; i < buffers.length; i++) {
+//            System.out.println("Buffer " + i + ":");
+//            Debug.PPrint(buffers[i]);
+//        }
 
         for (int i = 0; i < buffers.length; i++) {
             if (!buffers[i].isEmpty()) {
@@ -346,16 +346,16 @@ public class Groupby  extends Operator {
             // buffers[i] is not empty
             if (i < eos.length) {
                 if (!eos[i]) {
-                    System.out.println("eos[i] is false");
-                    System.out.println("Before reading");
-                    System.out.println("Buffer " + i + ":");
-                    Debug.PPrint(buffers[i]);
+//                    System.out.println("eos[i] is false");
+//                    System.out.println("Before reading");
+//                    System.out.println("Buffer " + i + ":");
+//                    Debug.PPrint(buffers[i]);
 
                     ReadRecordsIntoChosenBuffer(runs, buffers, eos, i, i);
 
-                    System.out.println("After reading");
-                    System.out.println("Buffer " + i + ":");
-                    Debug.PPrint(buffers[i]);
+//                    System.out.println("After reading");
+//                    System.out.println("Buffer " + i + ":");
+//                    Debug.PPrint(buffers[i]);
                 } else {
                     int availableRun = FindAvailableRunNum(eos);
 
@@ -373,11 +373,11 @@ public class Groupby  extends Operator {
             }
         }
 
-        System.out.println("==========After==========");
-        for (int i = 0; i < buffers.length; i++) {
-            System.out.println("Buffer " + i + ":");
-            Debug.PPrint(buffers[i]);
-        }
+//        System.out.println("==========After==========");
+//        for (int i = 0; i < buffers.length; i++) {
+//            System.out.println("Buffer " + i + ":");
+//            Debug.PPrint(buffers[i]);
+//        }
     }
 
     private void ReadRecordsIntoChosenBuffer(ArrayList<ObjectInputStream> runs, Batch[] buffers, boolean[] eos, int bufferNum, int runNum) {
