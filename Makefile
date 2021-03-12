@@ -34,6 +34,7 @@ experiment:
     java ConvertTxtToTbl SCHEDULE; \
 
 clean:
+	mv README.md README.temp
 	rm -fv *.md
 	rm -fv *.stat
 	rm -fv *.tbl
@@ -41,3 +42,4 @@ clean:
 	rm -fv *.out
 	rm -fv *.det
 	rm -fv temp-*
+	mv README.temp README.md
