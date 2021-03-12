@@ -22,6 +22,9 @@ public class RandomInitialPlan {
     ArrayList<Condition> selectionlist;   // List of select conditons
     ArrayList<Condition> joinlist;        // List of join conditions
     ArrayList<Attribute> groupbylist;
+    ArrayList<Attribute> orderbylist;     // List of attributes to order the results by
+    boolean isDesc; // for Orderby 
+    boolean isDistinct;
     int numJoin;            // Number of joins in this query
     HashMap<String, Operator> tab_op_hash;  // Table name to the Operator
     Operator root;          // Root of the query plan tree
@@ -33,7 +36,10 @@ public class RandomInitialPlan {
         selectionlist = sqlquery.getSelectionList();
         joinlist = sqlquery.getJoinList();
         groupbylist = sqlquery.getGroupByList();
+        orderbylist = sqlquery.getOrderByList();
+        isDesc = sqlquery.isDesc();
         numJoin = joinlist.size();
+        isDistinct = sqlquery.isDistinct();
     }
 
     /**
@@ -47,31 +53,34 @@ public class RandomInitialPlan {
      * prepare initial plan for the query
      **/
     public Operator prepareInitialPlan() {
-
-        if (sqlquery.isDistinct()) {
-            System.err.println("Distinct is not implemented.");
-            System.exit(1);
-        }
-
-        if (sqlquery.getGroupByList().size() > 0) {
-            System.err.println("GroupBy is not implemented.");
-            System.exit(1);
-        }
-
-        if (sqlquery.getOrderByList().size() > 0) {
-            System.err.println("Orderby is not implemented.");
-            System.exit(1);
-        }
-
         tab_op_hash = new HashMap<>();
         createScanOp();
         createSelectOp();
+
         if (numJoin != 0) {
             createJoinOp();
         }
+
+        if (sqlquery.getGroupByList().size() > 0) {
+            createGroupbyOp();
+        }
+
+        if (sqlquery.getOrderByList().size() > 0) {
+            createOrderbyOp();
+        }
+
         createProjectOp();
+        createDistinctOp();
 
         return root;
+    }
+
+    public void createDistinctOp() {
+        Operator base = root;
+        if (isDistinct) {
+            root = new Distinct(base, OpType.DISTINCT);
+            root.setSchema(base.getSchema());
+        }
     }
 
     /**
@@ -110,7 +119,7 @@ public class RandomInitialPlan {
         // this later in CreateProjectOp
         if (selectionlist.size() == 0) {
             root = tempop;
-            return;
+            return; // seems pointless
         }
 
     }
@@ -167,8 +176,9 @@ public class RandomInitialPlan {
             jn.setSchema(newsche);
 
             /** randomly select a join type**/
-            int numJMeth = JoinType.numJoinTypes();
-            int joinMeth = RandNumb.randInt(0, numJMeth - 1);
+//            int numJMeth = JoinType.numJoinTypes();
+//            int joinMeth = RandNumb.randInt(0, numJMeth - 1);
+            int joinMeth = 0;
             jn.setJoinType(joinMeth);
             modifyHashtable(left, jn);
             modifyHashtable(right, jn);
@@ -190,6 +200,43 @@ public class RandomInitialPlan {
             root = new Project(base, projectlist, OpType.PROJECT);
             Schema newSchema = base.getSchema().subSchema(projectlist);
             root.setSchema(newSchema);
+        }
+    }
+
+    public void createGroupbyOp() {
+        Operator base = root;
+        if (!groupbylist.isEmpty()) {
+            // Attribute in SELECT clause must appear in Group By clause or is a primary key.
+            for (Attribute attr : projectlist) {
+                if (!(attr.isPrimaryKey() || groupbylist.contains(attr))) {
+                    System.out.println("Attribute does not appear in Group By clause and is not a primary key.");
+                    System.exit(1);
+                }
+            }
+            root = new Groupby(base, groupbylist, OpType.GROUPBY);
+            root.setSchema(base.getSchema());
+        }
+    }
+
+    public void createOrderbyOp() {
+        Operator base = root;
+        if (!orderbylist.isEmpty()) {
+            if (!groupbylist.isEmpty()) {
+                // Combines groupby list and orderby list to maintain the groups when sorting.
+                ArrayList<Attribute> combinedList = new ArrayList<>(groupbylist);
+
+                // Doesn't include duplicated attributes in the combined list.
+                for (Attribute attr: orderbylist) {
+                    if (!combinedList.contains(attr)) {
+                        combinedList.add(attr);
+                    }
+                }
+                System.out.println(combinedList);
+                root = new Orderby(base, combinedList, OpType.ORDERBY, isDesc);
+            } else {
+                root = new Orderby(base, orderbylist, OpType.ORDERBY, isDesc);
+            }
+            root.setSchema(base.getSchema());
         }
     }
 

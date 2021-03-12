@@ -6,8 +6,13 @@ package qp.operators;
 
 import qp.utils.*;
 
-public class Debug {
+import java.io.EOFException;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.util.ArrayList;
 
+public class Debug {
     /**
      * print the attribute
      **/
@@ -117,9 +122,13 @@ public class Debug {
 
         } else if (optype == OpType.SCAN) {
             System.out.print(((Scan) node).getTabName());
+
+        } else if (optype == OpType.DISTINCT) {
+            System.out.println("Distinct(");
+            PPrint(((Distinct) node).getBase());
+            System.out.print(")");
         }
     }
-
 
     /**
      * print a tuple
@@ -138,7 +147,6 @@ public class Debug {
         System.out.println();
     }
 
-
     /**
      * print a page of tuples
      **/
@@ -149,6 +157,48 @@ public class Debug {
         }
     }
 
+    /**
+     * print an arraylist of tuples
+     **/
+    public static void PPrint(ArrayList<Tuple> l) {
+        for (Tuple t : l) {
+            PPrint(t);
+        }
+    }
+
+    /**
+     * Prints out the tuples in each of the Batches from a serialised file of Batches
+     * @param fn file name of serialised Batch objects
+     */
+    public static void PPrint(String fn) {
+        ObjectInputStream in = null;
+        System.out.println("Printing out serialised file of Batch objects: " + fn);
+        try {
+            in = new ObjectInputStream(new FileInputStream(fn));
+        } catch (Exception e) {
+            System.err.println(" Error reading " + fn);
+            System.exit(1);
+        }
+
+        while (true) {
+            try {
+                Batch data = (Batch) in.readObject();
+                Debug.PPrint(data);
+            } catch (ClassNotFoundException cnf) {
+                System.err.println("Debug:Class not found for reading file  " + fn);
+                System.exit(1);
+            } catch (EOFException EOF) {
+                /** At this point incomplete page is sent and at next call it considered
+                 ** as end of file
+                 **/
+                System.out.println("EOF reached.");
+                break;
+            } catch (IOException e) {
+                System.err.println("Debug:Error reading " + fn);
+                System.exit(1);
+            }
+        }
+    }
 }
 
 
