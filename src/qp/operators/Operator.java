@@ -5,6 +5,9 @@ package qp.operators;
 
 import qp.utils.Batch;
 import qp.utils.Schema;
+import qp.utils.Tuple;
+
+import java.util.ArrayList;
 
 public class Operator {
 
@@ -32,13 +35,13 @@ public class Operator {
     }
 
     public boolean open() {
-        System.err.println("Abstract interface cannot be used.");
+        System.err.println("open(): Abstract interface cannot be used.");
         System.exit(1);
         return true;
     }
 
     public Batch next() {
-        System.err.println("Abstract interface cannot be used.");
+        System.err.println("next(): Abstract interface cannot be used.");
         System.exit(1);
         return null;
     }

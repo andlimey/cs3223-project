@@ -1,13 +1,13 @@
 classes/
+out/
+.idea/
+*.iml
 *.md
 *.txt
 *.stat
 *.tbl
 *.det
-*.iml
-*.out
 /testoutput
 /out
 /.idea
 cs3223-project.iml
-temp*

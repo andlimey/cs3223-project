@@ -69,17 +69,86 @@ public class PlanCost {
      **/
     protected long calculateCost(Operator node) {
         if (node.getOpType() == OpType.JOIN) {
+            System.out.println("1");
             return getStatistics((Join) node);
         } else if (node.getOpType() == OpType.SELECT) {
+            System.out.println("2");
             return getStatistics((Select) node);
         } else if (node.getOpType() == OpType.PROJECT) {
+            System.out.println("3");
             return getStatistics((Project) node);
         } else if (node.getOpType() == OpType.SCAN) {
+            System.out.println("4");
             return getStatistics((Scan) node);
+        } else if (node.getOpType() == OpType.ORDERBY) {
+            System.out.println("5");
+            return getStatistics((Orderby) node);
+        } else if (node.getOpType() == OpType.GROUPBY) {
+            System.out.println("6");
+            return getStatistics((Groupby) node);
+        } else if (node.getOpType() == OpType.DISTINCT) {
+            System.out.println("7");
+            return getStatistics((Distinct) node);
         }
-        System.out.println("operator is not supported");
-        isFeasible = false;
+        System.out.println("operator is        isFeasible = false;\n not supported");
         return 0;
+    }
+
+    protected long getStatistics(Groupby node) {
+        long tuples = calculateCost(node.getBase());
+
+        long tupleSize = node.getSchema().getTupleSize();
+        long capacity = Math.max(1, Batch.getPageSize() / tupleSize);
+        long numPages = (long) Math.ceil(((double) tuples) / (double) capacity);
+        long numBuffers = node.getNumBuffer();
+
+        long numRuns = (long) Math.ceil(numPages / numBuffers);
+        long numPasses = 1 + (long) (Math.ceil(Math.log(numRuns) / Math.log(numBuffers - 1)));
+
+        cost += (2 * numPages * numPasses);
+
+        return tuples;
+    }
+
+    protected long getStatistics(Distinct node){
+            long tuples = calculateCost(node.getBase());
+
+            long tupleSize = node.getSchema().getTupleSize();
+            long capacity = Math.max(1, Batch.getPageSize() / tupleSize);
+            long numPages = (long) Math.ceil(((double) tuples) / (double) capacity);
+            long numBuffers = node.getNumBuffer();
+
+            /**
+             * Sort phase:
+             * - Read in |R| pages, sort internally, write out |R| pages for generated sorted runs
+             * - Do external sort by merging all the runs into a single run with log(b-1)(|R|/b) passes.
+             * - note: No projection is done, as this is handled by Project operator
+             *
+             * Merge phase:
+             * - Read in |R| pages and filter out duplicates
+             **/
+            long numRuns = numPages / numBuffers;
+            long numPasses = 1 + (long) (Math.ceil(Math.log(numRuns) / Math.log(numBuffers - 1)));
+
+            cost += (2 * numPages * numPasses) + numPages;
+
+            return tuples;
+    }
+
+    protected long getStatistics(Orderby node) {
+        long tuples = calculateCost(node.getBase());
+
+        long tupleSize = node.getSchema().getTupleSize();
+        long capacity = Math.max(1, Batch.getPageSize() / tupleSize);
+        long numPages = (long) Math.ceil(((double) tuples) / (double) capacity);
+        long numBuffers = node.getNumBuffer();
+
+        long numRuns = (long) Math.ceil(numPages / numBuffers);
+        long numPasses = 1 + (long) (Math.ceil(Math.log(numRuns) / Math.log(numBuffers - 1)));
+
+        cost += (2 * numPages * numPasses);
+
+        return tuples;
     }
 
     /**
@@ -142,7 +211,12 @@ public class PlanCost {
 
         switch (joinType) {
             case JoinType.NESTEDJOIN:
-                joincost = leftpages * rightpages;
+                joincost = leftpages + (leftpages * rightpages);
+                break;
+            case JoinType.SORTMERGE:
+                long leftsortcost = 2 * leftpages * (1 + (long) (Math.ceil(Math.log(Math.ceil(leftpages / numbuff)) / Math.log(numbuff - 1))));
+                long rightsortcost = 2 * rightpages * (1 + (long) (Math.ceil(Math.log(Math.ceil(rightpages / numbuff)) / Math.log(numbuff - 1))));
+                joincost = leftsortcost + rightsortcost + rightpages + leftpages;
                 break;
             case JoinType.BLOCKNESTED:
                 joincost = (long) Math.ceil((double) leftpages / (double) blockSize) * rightpages;

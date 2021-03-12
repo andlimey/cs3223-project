@@ -6,12 +6,21 @@ package qp.utils;
 
 import java.util.ArrayList;
 import java.io.Serializable;
+import java.util.Collection;
 
 public class Batch implements Serializable {
 
     int MAX_SIZE;             // Number of tuples per page
     static int PageSize;      // Number of bytes per page
     ArrayList<Tuple> tuples;  // The tuples in the page
+
+    public Batch copyOf(Batch b) {
+        Batch copy = new Batch(b.MAX_SIZE);
+        for (Tuple t : b.tuples) {
+            copy.add(t);
+        }
+        return copy;
+    }
 
     /** Set number of bytes per page **/
     public static void setPageSize(int size) {
@@ -45,6 +54,8 @@ public class Batch implements Serializable {
     public boolean contains(Tuple t) {
         return tuples.contains(t);
     }
+
+    public ArrayList<Tuple> getAllTuplesCopy() { return new ArrayList<>(tuples); }
 
     public Tuple get(int i) {
         return tuples.get(i);
