@@ -30,6 +30,7 @@ public class SortMergeJoin extends Join {
     int rcurs;                      // Cursor for right side buffer
     boolean eosl;                   // Whether end of stream (left table) is reached
     boolean eosr;                   // Whether end of stream (right table) is reached
+    boolean[] hasLeftBeenConsidered;        // Boolean array to check if tuples on the left table has been used for join.
 
     ArrayList<Tuple> rightPartition = new ArrayList<>();
     ObjectInputStream leftIn = null;
@@ -396,18 +397,19 @@ public class SortMergeJoin extends Join {
 
     @Override
     public Batch next() {
-        if (eosl || eosr) {
+        if (eosl) {
             return null;
         }
         outbatch = new Batch(batchsize);
 
         while (!outbatch.isFull()) {
-            if (eosl || eosr) return outbatch;
+            if (eosl) return outbatch;
 
             // Load r or s from their batches if empty
             try {
                 if (lcurs >= leftbatch.size()) {
                     leftbatch = (Batch) leftIn.readObject();
+                    hasLeftBeenConsidered = new boolean[leftbatch.size()];
                     lcurs = 0;
                 }
             } catch (EOFException e) {
@@ -453,7 +455,7 @@ public class SortMergeJoin extends Join {
                     ((eosr) || // for the case where left batch could still have tuples that can join with rightPartition
                     (Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftAttrIndex, rightAttrIndex) == -1))
             ) {
-                lcurs++;    // bug
+                if (hasLeftBeenConsidered[lcurs]) lcurs++;
                 if (lcurs >= leftbatch.size()) break;
                 if (!rightPartition.isEmpty() && Tuple.compareTuples(leftbatch.get(lcurs), rightPartition.get(0), leftAttrIndex, rightAttrIndex) == 0) {
                     for (Tuple r : rightPartition) {
@@ -461,7 +463,7 @@ public class SortMergeJoin extends Join {
 //                        System.out.println("Joining these tuples");
 //                        Debug.PPrint(leftbatch.get(lcurs));
 //                        Debug.PPrint(r);
-                        outbatch.add(leftbatch.get(lcurs).joinWith(r));
+                        outbatch.add(leftbatch.get(lcurs).joinWith(r)); // Incorrect implementation
                     }
                 } else {
                     // No match on LHS, clear rightPartition
@@ -471,6 +473,7 @@ public class SortMergeJoin extends Join {
 //                    System.out.println("Clearing rightPartition");
                     rightPartition.clear();
                 }
+                hasLeftBeenConsidered[lcurs] = true;
             }
             if (lcurs >= leftbatch.size()) continue;
 
@@ -493,7 +496,8 @@ public class SortMergeJoin extends Join {
 
                 assert leftbatch.get(lcurs).checkJoin(rightbatch.get(rcurs), leftAttrIndex, rightAttrIndex);
                 Tuple outtuple = leftbatch.get(lcurs).joinWith(rightbatch.get(rcurs));
-                outbatch.add(outtuple); 
+                outbatch.add(outtuple);
+                hasLeftBeenConsidered[lcurs] = true;
                 rcurs++;
             }
         }
