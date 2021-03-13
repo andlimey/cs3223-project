@@ -450,10 +450,10 @@ public class SortMergeJoin extends Join {
             }
 
             while (lcurs < leftbatch.size() &&
-                    (eosr) || // for the case where left batch could still have tuples that can join with rightPartition
-                    (Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftAttrIndex, rightAttrIndex) == -1)
+                    ((eosr) || // for the case where left batch could still have tuples that can join with rightPartition
+                    (Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftAttrIndex, rightAttrIndex) == -1))
             ) {
-                lcurs++;
+                lcurs++;    // bug
                 if (lcurs >= leftbatch.size()) break;
                 if (!rightPartition.isEmpty() && Tuple.compareTuples(leftbatch.get(lcurs), rightPartition.get(0), leftAttrIndex, rightAttrIndex) == 0) {
                     for (Tuple r : rightPartition) {
