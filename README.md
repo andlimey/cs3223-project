@@ -12,9 +12,9 @@ List of Operators Implemented
 - Groupby
 
 ### Implementation of Block Nested Loops Join
-The Block Nested Loops Join (BNJ) is modified from the given Nested Loops Join.  
+The Block Nested Loops Join (BNJ) implementation is modified from the given Nested Loops Join implementation.  
 The block size for BNJ is calculated using number of buffers - 2.  
-A new cursor is initailised for the outer block and a new boolean is initialised for the end of block object.  
+In the `open()` method, a new cursor is initailised for the outer block and a new boolean is initialised for the end of block object.  
 In the `next()` method, we simulate a block using Java's ArrayList. For each block, we will iterate through each left page and right page, matching the left tuples to the right tuples.  
 Once the outbatch is full, we will keep track of the cursor of the block, left and right for the next iteration.  
 ### Implmentation of Sort Merge Join
