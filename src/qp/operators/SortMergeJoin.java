@@ -4,7 +4,9 @@ import qp.utils.*;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.concurrent.ExecutionException;
 
 import static java.lang.Math.min;
 
@@ -17,8 +19,7 @@ public class SortMergeJoin extends Join {
     Batch rightbatch;               // Buffer page for right input stream
     ObjectInputStream in;           // File pointer to the right hand materialized file
 
-    ArrayList<Batch> allLeftBatches = new ArrayList<>();
-    ArrayList<Batch> allRightBatches = new ArrayList<>();
+    static int filenum = 0;
 
     int leftBatchSize;
     int rightBatchSize;
@@ -143,17 +144,20 @@ public class SortMergeJoin extends Join {
         if (!left.open() || !right.open()) return false;
 
         // External Sort
-        ArrayList<String> leftSortedRunNames = generateSortedRuns(left, leftAttrIndex,"temp-left", leftBatchSize);
+        ArrayList<String> leftSortedRunNames = generateSortedRuns(left, leftAttrIndex,"SMJtemp-left-" + filenum, leftBatchSize);
 //        System.out.println("leftSortedRunNames: " + leftSortedRunNames);
-        this.leftMergedRunName = mergeSortedRuns(leftSortedRunNames, "temp-left", 1, leftBatchSize, leftAttrIndex).get(0);
+        if (leftSortedRunNames.isEmpty()) return false;
+        this.leftMergedRunName = mergeSortedRuns(leftSortedRunNames, "SMJtemp-left-" + filenum, 1, leftBatchSize, leftAttrIndex).get(0);
 
-        ArrayList<String> rightSortedRunNames = generateSortedRuns(right, rightAttrIndex,"temp-right", rightBatchSize);
-//        System.out.println("rightSortedRunNames: " + rightSortedRunNames);
-        this.rightMergedRunName = mergeSortedRuns(rightSortedRunNames, "temp-right", 1, rightBatchSize, rightAttrIndex).get(0);
+        ArrayList<String> rightSortedRunNames = generateSortedRuns(right, rightAttrIndex,"SMJtemp-right-" + filenum, rightBatchSize);
+        if (rightSortedRunNames.isEmpty()) return false;
+        //        System.out.println("rightSortedRunNames: " + rightSortedRunNames);
+        this.rightMergedRunName = mergeSortedRuns(rightSortedRunNames, "SMJtemp-right-" + filenum, 1, rightBatchSize, rightAttrIndex).get(0);
 
 //        System.out.println("leftMergedRunName: " + this.leftMergedRunName);
 //        System.out.println("rightMergedRunName: " + this.rightMergedRunName);
 
+        filenum++;
 
         try {
             leftIn = new ObjectInputStream(new FileInputStream(leftMergedRunName));
@@ -430,7 +434,7 @@ public class SortMergeJoin extends Join {
             }
 
             try {
-                if (rcurs >= rightbatch.size()) {
+                if (!eosr && rcurs >= rightbatch.size()) {
                     rightbatch = (Batch) rightIn.readObject();
                     rcurs = 0;
                 }
