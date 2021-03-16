@@ -515,6 +515,7 @@ public class Orderby extends Operator {
     public boolean close() {
         // Destroy remaining run files
         DeleteFiles(runNames);
+        base.close();
         return true;
     }
 

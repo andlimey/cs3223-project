@@ -4,9 +4,8 @@ import qp.utils.*;
 
 import java.io.*;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.concurrent.ExecutionException;
+import java.util.List;
 
 import static java.lang.Math.min;
 
@@ -17,7 +16,6 @@ public class SortMergeJoin extends Join {
     Batch outbatch;                 // Buffer page for output
     Batch leftbatch;                // Buffer page for left input stream
     Batch rightbatch;               // Buffer page for right input stream
-    ObjectInputStream in;           // File pointer to the right hand materialized file
 
     static int filenum = 0;
 
@@ -94,12 +92,10 @@ public class SortMergeJoin extends Join {
     private void WriteRunToFile(ArrayList<Tuple> runToBeStored, ArrayList<String> runNames, String rfname, int bsize) {
         try {
             ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(rfname));
-//            System.out.println("Writing to " + rfname + ": ");
 
             Batch newbatch = new Batch(bsize);
             for (Tuple t : runToBeStored) {
                 newbatch.add(t);
-//                Debug.PPrint(t);
             }
             out.writeObject(newbatch);
             runNames.add(rfname);
@@ -145,17 +141,12 @@ public class SortMergeJoin extends Join {
 
         // External Sort
         ArrayList<String> leftSortedRunNames = generateSortedRuns(left, leftAttrIndex,"SMJtemp-left-" + filenum, leftBatchSize);
-//        System.out.println("leftSortedRunNames: " + leftSortedRunNames);
         if (leftSortedRunNames.isEmpty()) return false;
         this.leftMergedRunName = mergeSortedRuns(leftSortedRunNames, "SMJtemp-left-" + filenum, 1, leftBatchSize, leftAttrIndex).get(0);
 
         ArrayList<String> rightSortedRunNames = generateSortedRuns(right, rightAttrIndex,"SMJtemp-right-" + filenum, rightBatchSize);
         if (rightSortedRunNames.isEmpty()) return false;
-        //        System.out.println("rightSortedRunNames: " + rightSortedRunNames);
         this.rightMergedRunName = mergeSortedRuns(rightSortedRunNames, "SMJtemp-right-" + filenum, 1, rightBatchSize, rightAttrIndex).get(0);
-
-//        System.out.println("leftMergedRunName: " + this.leftMergedRunName);
-//        System.out.println("rightMergedRunName: " + this.rightMergedRunName);
 
         filenum++;
 
@@ -180,8 +171,6 @@ public class SortMergeJoin extends Join {
         for (int i = 0, j = min(numBuff-1, runFileNames.size()); i < j; i = j, j = min(j+numBuff-1, runFileNames.size())) {
             rfname = generateRunFileName(basename, passnum, mergedRuns.size());
             merge(new ArrayList<>(runFileNames.subList(i, j)), rfname, bsize, attrIndex);
-//            System.out.println("Writing runfile: " + rfname);
-//            Debug.PPrint(rfname);
             mergedRuns.add(rfname);
         }
 
@@ -194,9 +183,6 @@ public class SortMergeJoin extends Join {
     }
 
     private void merge(ArrayList<String> runNames, String mergedRunFileName, int bsize, int[] attrIndex) {
-//        System.out.println("====== merge(): " + mergedRunFileName + "======");
-//        System.out.println("Merging runs: " + runNames);
-
         // Init OOS for mergedRunFileName
         ObjectOutputStream oos = null;
         try {
@@ -405,7 +391,12 @@ public class SortMergeJoin extends Join {
             return null;
         }
         outbatch = new Batch(batchsize);
-
+//        Debug.PPrint(this);
+//        System.out.println("batch size: " + batchsize);
+//        Debug.PPrint(left);
+//        System.out.println("leftbatch size: " + leftBatchSize);
+//        Debug.PPrint(right);
+//        System.out.println("rightbatch size: " + rightBatchSize);
         while (!outbatch.isFull()) {
             if (eosl) return outbatch;
 
@@ -445,8 +436,6 @@ public class SortMergeJoin extends Join {
                     System.out.println("SortMergeJoin: Error in reading right merged run file");
                 }
                 eosr = true;
-                // don't return yet; left batch could still have tuples that can join with rightPartition
-                // return outbatch;
             } catch (ClassNotFoundException c) {
                 System.out.println("SortMergeJoin: Error in deserialising right merged run file ");
                 System.exit(1);
@@ -464,17 +453,9 @@ public class SortMergeJoin extends Join {
                 if (!rightPartition.isEmpty() && Tuple.compareTuples(leftbatch.get(lcurs), rightPartition.get(0), leftAttrIndex, rightAttrIndex) == 0) {
                     for (Tuple r : rightPartition) {
                         assert leftbatch.get(lcurs).checkJoin(rightPartition.get(0), leftAttrIndex, rightAttrIndex);
-//                        System.out.println("Joining these tuples");
-//                        Debug.PPrint(leftbatch.get(lcurs));
-//                        Debug.PPrint(r);
                         outbatch.add(leftbatch.get(lcurs).joinWith(r)); // Incorrect implementation
                     }
                 } else {
-                    // No match on LHS, clear rightPartition
-//                    System.out.println("No match for LHS and rightPartition[0]");
-//                    Debug.PPrint(leftbatch.get(lcurs));
-//                    Debug.PPrint(rightbatch.get(0));
-//                    System.out.println("Clearing rightPartition");
                     rightPartition.clear();
                 }
                 hasLeftBeenConsidered[lcurs] = true;
@@ -483,19 +464,16 @@ public class SortMergeJoin extends Join {
 
             while (rcurs < rightbatch.size() && Tuple.compareTuples(rightbatch.get(rcurs), leftbatch.get(lcurs), rightAttrIndex, leftAttrIndex) == -1) {
                 rcurs++;
+                rightPartition.clear();
             }
             if (rcurs >= rightbatch.size()) continue;
 
             if (Tuple.compareTuples(leftbatch.get(lcurs), rightbatch.get(rcurs), leftAttrIndex, rightAttrIndex) == 0) {
-//                System.out.println("Tuples match");
-//                Debug.PPrint(leftbatch.get(lcurs));
-//                Debug.PPrint(rightbatch.get(rcurs));
                 if ( rightPartition.isEmpty() || (!rightPartition.isEmpty() && Tuple.compareTuples(rightbatch.get(rcurs), rightPartition.get(0), rightAttrIndex, rightAttrIndex) == 0)) {
-//                    System.out.println("Added right tuple to rightPartition");
                     rightPartition.add(rightbatch.get(rcurs));
                 } else {
-//                    System.out.println("Reset rightPartition");
                     rightPartition.clear();
+                    rightPartition.add(rightbatch.get(rcurs));
                 }
 
                 assert leftbatch.get(lcurs).checkJoin(rightbatch.get(rcurs), leftAttrIndex, rightAttrIndex);
@@ -512,9 +490,10 @@ public class SortMergeJoin extends Join {
     public boolean close() {
         File lf = new File(leftMergedRunName);
         File rf = new File(rightMergedRunName);
-
         lf.delete();
         rf.delete();
+        left.close();
+        right.close();
         return true;
     }
 }

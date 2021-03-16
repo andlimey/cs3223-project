@@ -501,6 +501,7 @@ public class Groupby  extends Operator {
     public boolean close() {
         // Destroy remaining run files
         DeleteFiles(runNames);
+        base.close();
         return true;
     }
 
