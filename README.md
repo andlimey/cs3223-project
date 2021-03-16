@@ -1,7 +1,17 @@
 # CS3223-Project
 
-Include a README file that should cover sufficient information for the TA to figure out the implementation and understand the modifications easily.
+### Setting up the environment
+A makefile was created to quickly set up the environment for testing. The following commands are as such:
 
+`make build` runs `build.sh` to compile the necessary .java files.
+
+`make db` will generate and convert .det files into tables.
+
+`make experiment` is similar to `make db` but is used for the purposes of the experiments.
+
+`make clean` will remove all files created by `make db` and `make experiment`
+
+### Features Implemented
 List of JOINs Implemented
 - Block Nested Loops Join
 - Sort Merge Join
