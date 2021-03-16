@@ -23,7 +23,7 @@ public class RandomInitialPlan {
     ArrayList<Condition> joinlist;        // List of join conditions
     ArrayList<Attribute> groupbylist;
     ArrayList<Attribute> orderbylist;     // List of attributes to order the results by
-    boolean isDesc; // for Orderby 
+    boolean isDesc;                       // for Orderby
     boolean isDistinct;
     int numJoin;            // Number of joins in this query
     HashMap<String, Operator> tab_op_hash;  // Table name to the Operator
@@ -175,10 +175,9 @@ public class RandomInitialPlan {
             Schema newsche = left.getSchema().joinWith(right.getSchema());
             jn.setSchema(newsche);
 
-            /** randomly select a join type**/
-//            int numJMeth = JoinType.numJoinTypes();
-//            int joinMeth = RandNumb.randInt(0, numJMeth - 1);
-            int joinMeth = 0;
+            /** randomly selects a join type**/
+            int numJMeth = JoinType.numJoinTypes();
+            int joinMeth = RandNumb.randInt(0, numJMeth - 1);
             jn.setJoinType(joinMeth);
             modifyHashtable(left, jn);
             modifyHashtable(right, jn);
@@ -231,7 +230,6 @@ public class RandomInitialPlan {
                         combinedList.add(attr);
                     }
                 }
-                System.out.println(combinedList);
                 root = new Orderby(base, combinedList, OpType.ORDERBY, isDesc);
             } else {
                 root = new Orderby(base, orderbylist, OpType.ORDERBY, isDesc);
