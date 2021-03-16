@@ -22,11 +22,11 @@ db:
 experiment:
 	# For experiment
 	cp testcases/*det .; \
-    java RandomDB AIRCRAFTS 100; \
-    java RandomDB CERTIFIED 100; \
-    java RandomDB EMPLOYEES 100; \
-    java RandomDB FLIGHTS 100; \
-    java RandomDB SCHEDULE 100; \
+    java RandomDB AIRCRAFTS 10000; \
+    java RandomDB CERTIFIED 10000; \
+    java RandomDB EMPLOYEES 10000; \
+    java RandomDB FLIGHTS 10000; \
+    java RandomDB SCHEDULE 10000; \
     java ConvertTxtToTbl AIRCRAFTS; \
     java ConvertTxtToTbl CERTIFIED; \
     java ConvertTxtToTbl EMPLOYEES; \
