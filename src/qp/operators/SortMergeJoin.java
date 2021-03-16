@@ -5,8 +5,6 @@ import qp.utils.*;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
-
 import static java.lang.Math.min;
 
 public class SortMergeJoin extends Join {
@@ -221,22 +219,18 @@ public class SortMergeJoin extends Join {
             isMergeComplete = true;
             for(int i = 0; i < runs.size(); i++) { // only check eos for all runs
                 boolean isOISClosed = eos[i];
-//                System.out.println("isOISClosed: " + isOISClosed);
                 isMergeComplete &= isOISClosed;
             }
 
             for(int i = 0; i < buffers.length; i++) {
-//                System.out.println("buffers[" + i + "]: is empty");
                 isMergeComplete &= buffers[i].isEmpty();
             }
 
-//            System.out.println("isMergeComplete: " + isMergeComplete);
             if (isMergeComplete) {
                 for (int k = 0; k < buffers.length; k++) {
                     assert buffers[k].isEmpty();
                 }
                 assert out.isEmpty();
-//                System.out.print("Merge completed: " + mergedRunFileName + "\n\n");
                 continue;
             }
 
@@ -245,7 +239,6 @@ public class SortMergeJoin extends Join {
                 // Fill up buffers with inputs
                 for (int i = 0; i < buffers.length; i++) {
                     if (!buffers[i].isEmpty()) {
-//                        System.out.println("Buffer[" + i + "] is not empty yet, do not read in new batch from OIS");
                         continue; // buffer is still loaded
                     }
 
@@ -260,7 +253,6 @@ public class SortMergeJoin extends Join {
                                 System.exit(1);
                             } catch (EOFException EOF) {
                                 eos[i] = true; // Must remove the stream outside the loop
-//                                System.out.println("OIS[" + i + "] has closed");
                             } catch (IOException io) {
                                 System.err.println("merge: Error reading in batch");
                                 System.exit(1);
@@ -287,7 +279,6 @@ public class SortMergeJoin extends Join {
                                 System.exit(1);
                             } catch (EOFException EOF) {
                                 eos[availableRun] = true; // Must remove the stream outside the loop
-//                                System.out.println("OIS[" + availableRun + "] has closed");
                             } catch (IOException io) {
                                 System.err.println("merge: Error reading in batch");
                                 System.exit(1);
@@ -313,7 +304,6 @@ public class SortMergeJoin extends Join {
                             System.exit(1);
                         } catch (EOFException EOF) {
                             eos[availableRun] = true; // Must remove the stream outside the loop
-//                            System.out.println("OIS[" + availableRun + "] has closed");
                         } catch (IOException io) {
                             System.err.println("merge: Error reading in batch");
                             System.exit(1);
@@ -342,13 +332,6 @@ public class SortMergeJoin extends Join {
                 for (int i = 0; i < buffers.length; i++) {
                     if (buffers[i].isEmpty()) continue; // skip empty buffers
                     Tuple batchMin = buffers[i].get(0);
-//                    System.out.println("\nbuffers[" + i + "]");
-//                    Debug.PPrint(buffers[i]);
-//                    System.out.println("minSoFar: ");
-//                    Debug.PPrint(minSoFar);
-//                    System.out.println("batchMin: ");
-//                    Debug.PPrint(batchMin);
-
                     if (Tuple.compareTuples(minSoFar, batchMin, attrIndex, attrIndex) == 1) { // minSoFar > batchMin
                         minSoFar = batchMin;
                         chosen = buffers[i];
@@ -357,20 +340,14 @@ public class SortMergeJoin extends Join {
 
                 // chosen refers to the batch with the smallest 'minSoFar'
                 out.add(minSoFar);
-//                System.out.println("Selected minSoFar: ");
-//                Debug.PPrint(minSoFar);
                 chosen.remove(0); // head's index is 0
             }
 
             if (out.isEmpty()) {
-//                System.out.println("Empty batch discovered, don't write out.");
                 continue;
             }
             try {
-//                System.out.println("Writing out merged batch for " + mergedRunFileName);
-//                Debug.PPrint(out);
                 oos.writeObject(out.copyOf(out));
-
                 out.clear(); // empty output buffer
             } catch (IOException io) {
                 System.err.println("Trouble writing out object " + io);
@@ -391,12 +368,6 @@ public class SortMergeJoin extends Join {
             return null;
         }
         outbatch = new Batch(batchsize);
-//        Debug.PPrint(this);
-//        System.out.println("batch size: " + batchsize);
-//        Debug.PPrint(left);
-//        System.out.println("leftbatch size: " + leftBatchSize);
-//        Debug.PPrint(right);
-//        System.out.println("rightbatch size: " + rightBatchSize);
         while (!outbatch.isFull()) {
             if (eosl) return outbatch;
 
