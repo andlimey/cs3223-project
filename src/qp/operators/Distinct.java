@@ -65,9 +65,6 @@ public class Distinct extends Operator{
         int tuplesize = schema.getTupleSize();
         batchsize = Batch.getPageSize() / tuplesize;
 
-        System.out.println("Size of tuple is: " + tuplesize);
-        System.out.println("Batch size is: " + batchsize);
-
         if (!base.open()) return false;
         StoreIndexToDistinct();
         GenerateSortedRuns();
@@ -170,7 +167,6 @@ public class Distinct extends Operator{
         for (int i = 0; i < passCounter; i++) {
             numRuns = 0;    // Reset to 0 for the next pass.
             passNum++;
-            System.out.println("Run names being merged are: " + runNames);
 
             // Number of runs to merge is constrained by number of buffers available
             // j and k are used to retrieve the set of runs to merge
@@ -186,7 +182,6 @@ public class Distinct extends Operator{
             // Deletes runs already merged in current pass.
             DeleteFiles(runNames);
 
-            System.out.println("Merged Runs are: " + mergedRuns);
             runNames.clear();
             runNames.addAll(mergedRuns);
             mergedRuns.clear();
@@ -194,8 +189,6 @@ public class Distinct extends Operator{
     }
 
     private void MergeKArrays(ArrayList<String> runsToMerge, String mergedFileName) {
-        System.out.println("====== merge(): " + mergedFileName + "======");
-        System.out.println("Merging runs " + runsToMerge);
 
         ObjectOutputStream outputStream = null;
         try {
@@ -215,7 +208,6 @@ public class Distinct extends Operator{
             // Check if merging is completed
             isMergeComplete = CheckIfMergeComplete(endOfStream, buffers);
             if (isMergeComplete) {
-                System.out.println("Merge completed: " + mergedFileName + "\n");
                 continue;
             }
 
@@ -239,10 +231,7 @@ public class Distinct extends Operator{
                 if (chosenTuple == null) {
                     // Input buffers are all empty and output buffer is not full. Break and write out.
                     break;
-                } else {
-                    System.out.println("Current chosen tuple is: ");
-                    Debug.PPrint(chosenTuple);
-                }
+                } 
 
                 // Find minimum/maximum
                 for (int i = 0; i < buffers.length; i++) {
@@ -258,25 +247,17 @@ public class Distinct extends Operator{
                 }
 
                 // Add chosen to output buffer
-                System.out.print("Chosen tuple is: ");
-                Debug.PPrint(chosenTuple);
 
                 outbatch.add(chosenTuple);
-                System.out.println("Current outbatch is: ");
-                Debug.PPrint(outbatch);
-
                 chosenBatch.remove(0);
             }
 
             if (outbatch.isEmpty()) {
-                System.out.println("Output buffer is empty. Don't write");
                 continue;
             }
 
             // Write out to file
             try {
-                System.out.println("Outbatch to write out is: ");
-                Debug.PPrint(outbatch);
                 outputStream.writeObject(outbatch.copyOf(outbatch));
                 outbatch.clear();
             } catch (IOException io) {
@@ -284,9 +265,6 @@ public class Distinct extends Operator{
                 System.exit(1);
             }
         }
-
-        System.out.println("Printing file name");
-        Debug.PPrint(mergedFileName);
 
         try {
             outputStream.close();
@@ -319,31 +297,19 @@ public class Distinct extends Operator{
     }
 
     private void ReadTuplesIntoBuffer(ArrayList<ObjectInputStream> runs, Batch[] buffers, boolean[] eos) {
-        System.out.println("==========Before==========");
         for (int i = 0; i < buffers.length; i++) {
-            System.out.println("Buffer " + i + ":");
             Debug.PPrint(buffers[i]);
         }
 
         for (int i = 0; i < buffers.length; i++) {
             if (!buffers[i].isEmpty()) {
-                System.out.println("Buffer " + i + " still contain tuples. Don't read in new batch yet");
                 continue;
             }
 
             // buffers[i] is not empty
             if (i < eos.length) {
                 if (!eos[i]) {
-                    System.out.println("eos[i] is false");
-                    System.out.println("Before reading");
-                    System.out.println("Buffer " + i + ":");
-                    Debug.PPrint(buffers[i]);
-
                     ReadRecordsIntoChosenBuffer(runs, buffers, eos, i, i);
-
-                    System.out.println("After reading");
-                    System.out.println("Buffer " + i + ":");
-                    Debug.PPrint(buffers[i]);
                 } else {
                     int availableRun = FindAvailableRunNum(eos);
 
@@ -361,9 +327,7 @@ public class Distinct extends Operator{
             }
         }
 
-        System.out.println("==========After==========");
         for (int i = 0; i < buffers.length; i++) {
-            System.out.println("Buffer " + i + ":");
             Debug.PPrint(buffers[i]);
         }
     }
@@ -377,7 +341,6 @@ public class Distinct extends Operator{
             System.out.println("Class not found for reading batch");
             System.exit(1);
         } catch (EOFException eof) {
-            System.out.println("EOF reached for this run: " + runNum);
             eos[runNum] = true;
         } catch (IOException io) {
             System.out.println("Error reading in batch.");
@@ -431,8 +394,6 @@ public class Distinct extends Operator{
         while (!outbatch.isFull()) {
             if (reader.isEOF()) {
                 outbatch.add(unique);
-                // System.out.println("Reader EOF reached. Return current outbatch.");
-                // Debug.PPrint(outbatch);
                 return outbatch;
             }
             nextTuple = reader.next();
@@ -444,8 +405,6 @@ public class Distinct extends Operator{
             // when unique == nextTuple, ignore the duplicates
         }
 
-        // System.out.println("Outbatch is full.");
-        Debug.PPrint(outbatch);
         return outbatch;
     }
 
