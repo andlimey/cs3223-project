@@ -49,5 +49,5 @@ If the above conditions are not fulfilled, RandomInitialPlan will not allow the 
 Bug 1: Plancost of Nested Join is incorrect
 - The joinCost was calculated as `leftpages * rightpages` when it should be `leftpages + leftpages * rightpages`
 
-Bug 2: NestedJoin did not call close() on left and right child operators
-- NestedJoin::close() should call left.close() and right.close() so that all the operators in the left and right subtrees are recursively called, and cleanup of unused temporary files is done. 
+Bug 2: Nested Join did not call close() on left and right child operators
+- `NestedJoin::close()` should call `left.close()` and `right.close()` so that all the operators in the left and right subtrees are recursively called, and cleanup of unused temporary files is done. 
