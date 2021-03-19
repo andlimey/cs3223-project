@@ -424,7 +424,7 @@ public class SortMergeJoin extends Join {
                 if (!rightPartition.isEmpty() && Tuple.compareTuples(leftbatch.get(lcurs), rightPartition.get(0), leftAttrIndex, rightAttrIndex) == 0) {
                     for (Tuple r : rightPartition) {
                         assert leftbatch.get(lcurs).checkJoin(rightPartition.get(0), leftAttrIndex, rightAttrIndex);
-                        outbatch.add(leftbatch.get(lcurs).joinWith(r)); // Incorrect implementation
+                        outbatch.add(leftbatch.get(lcurs).joinWith(r));
                     }
                 } else {
                     rightPartition.clear();
